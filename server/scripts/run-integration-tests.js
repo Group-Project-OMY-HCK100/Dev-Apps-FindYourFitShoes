@@ -1,6 +1,6 @@
 const { spawnSync } = require('child_process');
 
-const result = spawnSync(process.execPath, ['--test', 'tests/integration/api-socket.test.js'], {
+const result = spawnSync(process.execPath, ['--test', '--test-concurrency=1', 'tests/integration/api-socket.test.js', 'tests/integration/socket-contract.test.js'], {
   stdio: 'inherit',
   env: {
     ...process.env,
