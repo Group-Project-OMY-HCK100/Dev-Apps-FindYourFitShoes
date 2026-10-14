@@ -25,12 +25,25 @@ function withAck(handler) {
     try { respond({ success: true, data: await handler(payload) }); } catch (error) {
       if (!error.status && process.env.NODE_ENV !== 'test') console.error(error);
       respond(socketError(error));
+      if (error.code === 'TOKEN_EXPIRED') error.socket.disconnect(true);
     }
   };
 }
 
 function requireAuthenticated(socket) {
   if (!socket.user) throw new ApiError(401, 'UNAUTHORIZED', 'Socket terautentikasi diperlukan');
+  if (socket.tokenExpiresAt <= Date.now()) {
+    const error = new ApiError(401, 'TOKEN_EXPIRED', 'Token socket telah kedaluwarsa');
+    error.socket = socket;
+    throw error;
+  }
+}
+
+function scheduleExpiry(socket) {
+  if (!Number.isFinite(socket.tokenExpiresAt) || !socket.connected) return;
+  const remaining = socket.tokenExpiresAt - Date.now();
+  if (remaining <= 0) { socket.disconnect(true); return; }
+  socket.expiryTimer = setTimeout(() => scheduleExpiry(socket), Math.min(remaining, 2_147_483_647));
 }
 
 function eventBudget(socket, bucket = 'private', limit = 120) {
@@ -237,8 +250,7 @@ function registerSockets(io) {
       const previousConnections = connectionCounts.get(socket.user.id) || 0;
       connectionCounts.set(socket.user.id, previousConnections + 1);
       socket.presenceCounted = true;
-      const remaining = socket.tokenExpiresAt - Date.now();
-      socket.expiryTimer = setTimeout(() => socket.disconnect(true), Math.max(0, remaining));
+      scheduleExpiry(socket);
       void broadcastPresence(io, socket.user.id, true, socket, connectionCounts, previousConnections === 0);
     }
   });
