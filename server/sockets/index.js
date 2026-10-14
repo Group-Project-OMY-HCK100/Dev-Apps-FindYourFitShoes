@@ -33,11 +33,13 @@ function requireAuthenticated(socket) {
   if (!socket.user) throw new ApiError(401, 'UNAUTHORIZED', 'Socket terautentikasi diperlukan');
 }
 
-function privateEventBudget(socket) {
+function eventBudget(socket, bucket = 'private', limit = 120) {
   const now = Date.now();
-  socket.privateEvents = (socket.privateEvents || []).filter((time) => now - time < 60000);
-  if (socket.privateEvents.length >= 120) throw new ApiError(429, 'RATE_LIMITED', 'Terlalu banyak event socket');
-  socket.privateEvents.push(now);
+  socket.eventBudgets ||= {};
+  const events = (socket.eventBudgets[bucket] || []).filter((time) => now - time < 60000);
+  socket.eventBudgets[bucket] = events;
+  if (events.length >= limit) throw new ApiError(429, 'RATE_LIMITED', 'Terlalu banyak event socket');
+  events.push(now);
 }
 
 async function socketAuth(socket, next) {
@@ -74,21 +76,48 @@ async function broadcastPresence(io, userId, online, targetSocket, connectionCou
 
 function registerSockets(io) {
   const connectionCounts = new Map();
+  const ipCounts = new Map();
   io.use(socketAuth);
+  io.use((socket, next) => {
+    const forwarded = socket.handshake.headers['x-forwarded-for'];
+    const ip = env.nodeEnv === 'production' && typeof forwarded === 'string'
+      ? forwarded.split(',')[0].trim() : socket.handshake.address;
+    const count = ipCounts.get(ip) || 0;
+    if (count >= env.socketMaxConnectionsPerIp) {
+      const error = new Error('RATE_LIMITED');
+      error.data = { code: 'RATE_LIMITED', message: 'Batas koneksi socket per IP tercapai' };
+      return next(error);
+    }
+    ipCounts.set(ip, count + 1);
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      const remaining = (ipCounts.get(ip) || 1) - 1;
+      if (remaining) ipCounts.set(ip, remaining);
+      else ipCounts.delete(ip);
+    };
+    socket.once('disconnect', release);
+    socket.conn.once('close', release);
+    next();
+  });
   io.on('connection', async (socket) => {
     socket.listingSubscriptions = new Set();
 
     socket.on('catalog:join', withAck(async (payload) => {
+      eventBudget(socket, 'public', 60);
       rejectUnknownFields(payload, []);
       await socket.join('catalog');
       return { joined: true };
     }));
     socket.on('catalog:leave', withAck(async (payload) => {
+      eventBudget(socket, 'public', 60);
       rejectUnknownFields(payload, []);
       await socket.leave('catalog');
       return { joined: false };
     }));
     socket.on('listing:join', withAck(async (payload) => {
+      eventBudget(socket, 'public', 60);
       rejectUnknownFields(payload, ['shoeId']);
       const shoeId = assertUuid(payload.shoeId, 'shoeId');
       const shoe = await Shoe.findByPk(shoeId);
@@ -101,6 +130,7 @@ function registerSockets(io) {
       return { joined: true, shoeId };
     }));
     socket.on('listing:leave', withAck(async (payload) => {
+      eventBudget(socket, 'public', 60);
       rejectUnknownFields(payload, ['shoeId']);
       const shoeId = assertUuid(payload.shoeId, 'shoeId');
       await socket.leave(`shoes:${shoeId}`);
@@ -110,7 +140,7 @@ function registerSockets(io) {
 
     socket.on('chat:join', withAck(async (payload) => {
       requireAuthenticated(socket);
-      privateEventBudget(socket);
+      eventBudget(socket);
       rejectUnknownFields(payload, ['chatId']);
       const chatId = assertUuid(payload.chatId, 'chatId');
       try { await chatService.findParticipantChat(chatId, socket.user.id); } catch (error) {
@@ -122,7 +152,7 @@ function registerSockets(io) {
     }));
     socket.on('chat:leave', withAck(async (payload) => {
       requireAuthenticated(socket);
-      privateEventBudget(socket);
+      eventBudget(socket);
       rejectUnknownFields(payload, ['chatId']);
       const chatId = assertUuid(payload.chatId, 'chatId');
       await chatService.findParticipantChat(chatId, socket.user.id);
@@ -132,7 +162,7 @@ function registerSockets(io) {
 
     socket.on('message:send', withAck(async (payload) => {
       requireAuthenticated(socket);
-      privateEventBudget(socket);
+      eventBudget(socket);
       rejectUnknownFields(payload, ['chatId', 'clientMessageId', 'text']);
       const chatId = assertUuid(payload.chatId, 'chatId');
       const clientMessageId = assertUuid(payload.clientMessageId, 'clientMessageId');
@@ -161,7 +191,7 @@ function registerSockets(io) {
     for (const [incoming, isTyping] of [['typing:start', true], ['typing:stop', false]]) {
       socket.on(incoming, withAck(async (payload) => {
         requireAuthenticated(socket);
-        privateEventBudget(socket);
+        eventBudget(socket);
         rejectUnknownFields(payload, ['chatId']);
         const chatId = assertUuid(payload.chatId, 'chatId');
         await chatService.findParticipantChat(chatId, socket.user.id);
@@ -172,7 +202,7 @@ function registerSockets(io) {
 
     socket.on('chat:read', withAck(async (payload) => {
       requireAuthenticated(socket);
-      privateEventBudget(socket);
+      eventBudget(socket);
       rejectUnknownFields(payload, ['chatId', 'lastReadMessageId']);
       const chatId = assertUuid(payload.chatId, 'chatId');
       if (payload.lastReadMessageId !== undefined) assertUuid(payload.lastReadMessageId, 'lastReadMessageId');
