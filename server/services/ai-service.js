@@ -6,6 +6,13 @@ const { shoeSummary } = require('../utils/serializers');
 
 const FILTER_KEYS = ['category', 'minPrice', 'maxPrice', 'size', 'excludeColors', 'preferColors'];
 const sellerInclude = { model: User, as: 'seller', attributes: ['id', 'name'] };
+const PRICE_WORDS = new Map([
+  ['setengah', 0.5], ['satu', 1], ['dua', 2], ['tiga', 3], ['empat', 4], ['lima', 5],
+  ['enam', 6], ['tujuh', 7], ['delapan', 8], ['sembilan', 9], ['sepuluh', 10],
+]);
+const PRICE_AMOUNT_SOURCE = String.raw`(?:rp\.?\s*)?(?:(?:\d{1,3}(?:[.\s]\d{3})+|\d+(?:[.,]\d+)?)\s*(?:juta|jt|ribu|rb)?|(?:setengah|satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan|sepuluh)\s*(?:juta|ribu)|sejuta|seribu)`;
+const MAX_PRICE_MARKER = String.raw`(?:di\s*bawah|dibawah|kurang\s+dari|maksimal|maksimum|max(?:imum)?|tidak\s+lebih\s+dari|hingga|sampai|budget|anggaran)`;
+const MIN_PRICE_MARKER = String.raw`(?:di\s*atas|diatas|lebih\s+dari|minimal|minimum|min(?:imum)?|mulai\s+dari)`;
 const GEMINI_RESPONSE_SCHEMA = {
   type: 'OBJECT',
   properties: {
@@ -36,6 +43,47 @@ function normalizeFilters(value) {
     delete result.maxPrice;
   }
   return result;
+}
+
+function parseCurrencyAmount(value) {
+  const normalized = String(value).toLowerCase().replace(/^rp\.?\s*/u, '').trim();
+  if (normalized === 'sejuta') return 1_000_000;
+  if (normalized === 'seribu') return 1_000;
+
+  const wordMatch = normalized.match(/^(setengah|satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan|sepuluh)\s*(juta|ribu)$/u);
+  if (wordMatch) return PRICE_WORDS.get(wordMatch[1]) * (wordMatch[2] === 'juta' ? 1_000_000 : 1_000);
+
+  const numericMatch = normalized.match(/^([\d.,\s]+?)\s*(juta|jt|ribu|rb)?$/u);
+  if (!numericMatch) return null;
+  const unit = numericMatch[2];
+  let numberText = numericMatch[1].replace(/\s/g, '');
+  let amount;
+  if (unit) {
+    numberText = numberText.replace(',', '.');
+    if ((numberText.match(/\./g) || []).length > 1) numberText = numberText.replace(/\./g, '');
+    amount = Number(numberText) * (unit === 'juta' || unit === 'jt' ? 1_000_000 : 1_000);
+  } else {
+    amount = Number(numberText.replace(/[.,]/g, ''));
+  }
+  return Number.isSafeInteger(amount) && amount >= 1 && amount <= 100_000_000 ? amount : null;
+}
+
+function extractExplicitPriceFilters(query) {
+  const result = {};
+  const patterns = [
+    ['maxPrice', new RegExp(`${MAX_PRICE_MARKER}(?:\\s+harga)?\\s*(${PRICE_AMOUNT_SOURCE})`, 'iu')],
+    ['minPrice', new RegExp(`${MIN_PRICE_MARKER}(?:\\s+harga)?\\s*(${PRICE_AMOUNT_SOURCE})`, 'iu')],
+  ];
+  for (const [field, pattern] of patterns) {
+    const match = String(query).match(pattern);
+    const amount = match ? parseCurrencyAmount(match[1]) : null;
+    if (amount !== null) result[field] = amount;
+  }
+  return result;
+}
+
+function enforceExplicitPriceFilters(filters, query) {
+  return normalizeFilters({ ...filters, ...extractExplicitPriceFilters(query) });
 }
 
 function sanitizeInterpretation(filters, query) {
@@ -109,6 +157,7 @@ async function interpretWithGemini(query, signal, config = env.llm) {
     }
     const retryable = response.status === 429 || response.status >= 500;
     if (!retryable || attempt === 1) throw new Error(`Gemini HTTP ${response.status}`);
+    await new Promise((resolve) => setTimeout(resolve, 500 + Math.floor(Math.random() * 250)));
   }
   throw new Error('Gemini request failed');
 }
@@ -173,14 +222,24 @@ async function queryByFilters(filters, limit) {
   return Shoe.findAll({ where, include: [sellerInclude], order, limit });
 }
 
-const STOP_WORDS = new Set(['sepatu', 'yang', 'dan', 'atau', 'dengan', 'untuk', 'dari', 'di', 'ke', 'saya', 'cari', 'mau', 'jangan', 'warna', 'harga']);
+const STOP_WORDS = new Set([
+  'sepatu', 'yang', 'dan', 'atau', 'dengan', 'untuk', 'dari', 'di', 'ke', 'saya', 'cari', 'mau', 'jangan', 'warna', 'harga',
+  'bawah', 'dibawah', 'atas', 'diatas', 'kurang', 'lebih', 'maksimal', 'maksimum', 'max', 'minimal', 'minimum', 'min', 'hingga',
+  'sampai', 'mulai', 'tidak', 'budget', 'anggaran', 'rp', 'juta', 'jt', 'ribu', 'rb', 'setengah', 'satu', 'dua', 'tiga', 'empat',
+  'lima', 'enam', 'tujuh', 'delapan', 'sembilan', 'sepuluh', 'sejuta', 'seribu',
+]);
 function relevantTerms(query) {
-  return [...new Set(query.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((word) => word.length >= 2 && !STOP_WORDS.has(word)))].slice(0, 8);
+  return [...new Set(query.toLowerCase().split(/[^\p{L}\p{N}]+/u)
+    .filter((word) => word.length >= 2 && !/^\d+$/u.test(word) && !/^rp\d+$/u.test(word) && !STOP_WORDS.has(word)))].slice(0, 8);
 }
 
-async function fallbackSearch(query, limit) {
+async function fallbackSearch(query, limit, explicitFilters = {}) {
   const terms = relevantTerms(query);
   const where = { status: 'available' };
+  if (explicitFilters.minPrice || explicitFilters.maxPrice) where.price = {
+    ...(explicitFilters.minPrice ? { [Op.gte]: explicitFilters.minPrice } : {}),
+    ...(explicitFilters.maxPrice ? { [Op.lte]: explicitFilters.maxPrice } : {}),
+  };
   if (terms.length) {
     where[Op.or] = terms.flatMap((term) => ['brand', 'article', 'description'].map((field) => ({ [field]: { [Op.iLike]: `%${term}%` } })));
   }
@@ -188,8 +247,9 @@ async function fallbackSearch(query, limit) {
 }
 
 async function search(query, overrides, limit) {
+  const explicitPriceFilters = extractExplicitPriceFilters(query);
   try {
-    const interpretedFilters = applyOverrides(await interpret(query), overrides);
+    const interpretedFilters = applyOverrides(enforceExplicitPriceFilters(await interpret(query), query), overrides);
     const shoes = await queryByFilters(interpretedFilters, limit);
     return {
       mode: 'ai', query, interpretedFilters,
@@ -198,7 +258,8 @@ async function search(query, overrides, limit) {
       meta: { totalItems: shoes.length, limit },
     };
   } catch {
-    const shoes = await fallbackSearch(query, limit);
+    const fallbackFilters = applyOverrides(explicitPriceFilters, overrides);
+    const shoes = await fallbackSearch(query, limit, fallbackFilters);
     return {
       mode: 'fallback', query, interpretedFilters: null,
       results: shoes.map((shoe) => ({ shoe: shoeSummary(shoe), reason: null })),
@@ -212,6 +273,9 @@ module.exports = {
   FILTER_KEYS,
   GEMINI_RESPONSE_SCHEMA,
   normalizeFilters,
+  parseCurrencyAmount,
+  extractExplicitPriceFilters,
+  enforceExplicitPriceFilters,
   sanitizeInterpretation,
   applyOverrides,
   validateOverrides,

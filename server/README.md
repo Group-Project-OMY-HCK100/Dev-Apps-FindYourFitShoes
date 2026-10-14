@@ -28,13 +28,15 @@ Konfigurasi Gemini yang dipakai AI search:
 ```dotenv
 LLM_PROVIDER=gemini
 GEMINI_API_KEY=your_private_gemini_key
-GEMINI_MODEL=gemini-3.6-flash
+GEMINI_MODEL=gemini-3.5-flash-lite
 GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta
 GEMINI_THINKING_LEVEL=low
 AI_TIMEOUT_MS=8000
 ```
 
 Provider `openai` dan `openai-compatible` tetap didukung melalui `LLM_API_KEY`, `LLM_MODEL`, dan `LLM_BASE_URL`. Jika provider gagal, timeout, atau menghasilkan JSON invalid, `POST /ai/search` tetap sukses dalam mode `fallback` sesuai PRD.
+Batas harga eksplisit berbahasa Indonesia seperti `di bawah 1 juta`, `maksimal 750 ribu`, atau `di atas Rp500.000` divalidasi ulang oleh server dan tetap diterapkan ketika provider masuk mode fallback.
+Error Gemini sementara (`429`/`5xx`) dicoba ulang sekali dengan jeda singkat selama masih berada dalam batas `AI_TIMEOUT_MS`.
 
 ## Endpoint
 

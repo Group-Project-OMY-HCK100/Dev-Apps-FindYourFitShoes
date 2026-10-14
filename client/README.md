@@ -39,3 +39,4 @@ npm run build
 ```
 
 Uji manual dengan backend aktif: register, login, password salah, email duplikat, klik Chat penjual sebagai guest, refresh halaman privat, dan logout. Tampilan home/detail tetap bisa ditinjau saat backend tidak aktif. Folder server tidak diubah.
+

@@ -7,6 +7,9 @@ const {
   validateOverrides,
   relevantTerms,
   interpretWithGemini,
+  parseCurrencyAmount,
+  extractExplicitPriceFilters,
+  enforceExplicitPriceFilters,
 } = require('../../services/ai-service');
 
 test('normalizeFilters hanya mempertahankan filter allowlist yang valid', () => {
@@ -30,6 +33,31 @@ test('override invalid dapat ditolak controller', () => {
 
 test('fallback mengambil kata relevan tanpa stop words', () => {
   assert.deepEqual(relevantTerms('cari sepatu lari hitam untuk saya'), ['lari', 'hitam']);
+  assert.deepEqual(relevantTerms('Nike harga di bawah 1 juta'), ['nike']);
+  assert.deepEqual(relevantTerms('harga di bawah Rp1.000.000'), []);
+});
+
+test('nominal rupiah natural dinormalisasi menjadi integer', () => {
+  assert.equal(parseCurrencyAmount('1 juta'), 1_000_000);
+  assert.equal(parseCurrencyAmount('1,5 juta'), 1_500_000);
+  assert.equal(parseCurrencyAmount('Rp1.000.000'), 1_000_000);
+  assert.equal(parseCurrencyAmount('750 ribu'), 750_000);
+  assert.equal(parseCurrencyAmount('satu juta'), 1_000_000);
+});
+
+test('batas harga eksplisit diekstrak tanpa salah membaca ukuran', () => {
+  assert.deepEqual(extractExplicitPriceFilters('cari harga dibawah 1 juta'), { maxPrice: 1_000_000 });
+  assert.deepEqual(extractExplicitPriceFilters('sepatu di bawah Rp1.000.000'), { maxPrice: 1_000_000 });
+  assert.deepEqual(extractExplicitPriceFilters('budget maksimal satu juta'), { maxPrice: 1_000_000 });
+  assert.deepEqual(extractExplicitPriceFilters('harga di atas 500 ribu'), { minPrice: 500_000 });
+  assert.deepEqual(extractExplicitPriceFilters('sepatu ukuran 42'), {});
+});
+
+test('batas harga eksplisit mengoreksi interpretasi LLM', () => {
+  assert.deepEqual(
+    enforceExplicitPriceFilters({ category: 'casual', maxPrice: 1_500_000 }, 'casual dibawah 1 juta'),
+    { category: 'casual', maxPrice: 1_000_000 },
+  );
 });
 
 test('adapter Gemini meminta structured JSON dan menormalisasi respons', async () => {

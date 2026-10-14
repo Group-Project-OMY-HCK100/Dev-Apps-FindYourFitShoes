@@ -782,7 +782,7 @@ Errors: `401 UNAUTHORIZED`, `403 FORBIDDEN`, `404 SHOE_NOT_FOUND`, `413 FILE_TOO
 
 #### `PATCH /shoes/:id/status` — `200 OK` (Owner)
 
-Request:
+Request Body:
 
 ```json
 { "status": "sold" }
