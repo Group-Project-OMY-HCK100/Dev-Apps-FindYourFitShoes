@@ -26,8 +26,14 @@ const COLOR_ALIASES = new Map([
 const CATEGORY_ALIASES = new Map([
   ['basketball', 'basketball'], ['basket', 'basketball'], ['running', 'running'], ['lari', 'running'], ['jogging', 'running'],
   ['casual', 'casual'], ['kasual', 'casual'], ['santai', 'casual'], ['formal', 'formal'], ['kantor', 'formal'],
-  ['sneakers', 'sneakers'], ['sneaker', 'sneakers'], ['hiking', 'hiking'], ['mendaki', 'hiking'],
+  ['sneakers', 'sneakers'], ['sneaker', 'sneakers'],
 ]);
+const SEMANTIC_CATEGORY_RULES = [
+  ['running', /\b(?:olahraga|sport|sports|gym|fitness|workout|latihan|aktivitas\s+fisik|aktif\s+bergerak)\b/u],
+  ['formal', /\b(?:acara\s+resmi|rapat|meeting|wawancara|interview|pernikahan|nikahan)\b/u],
+  ['sneakers', /\b(?:streetwear|street\s+style|gaya\s+jalanan)\b/u],
+  ['casual', /\b(?:kampus|kuliah|harian|sehari\s+hari|daily|nongkrong|jalan\s+jalan|komuter|commute)\b/u],
+];
 const SHOE_SIZE_STRINGS = Array.from({ length: 31 }, (_, index) => String(35 + index * 0.5));
 const EMPTY_QUERY_NOTICE = 'Sepatu tidak ditemukan. Masukkan prompt yang berkaitan dengan sepatu atau tuliskan kebutuhan sepatu Anda.';
 const GEMINI_RESPONSE_SCHEMA = {
@@ -177,8 +183,27 @@ function extractExplicitListingFilters(query, knownBrands = []) {
   return normalizeFilters(result);
 }
 
+function extractSemanticFilters(query) {
+  const normalized = normalizeQueryText(query);
+  for (const [category, pattern] of SEMANTIC_CATEGORY_RULES) {
+    if (pattern.test(normalized)) return { category };
+  }
+  return {};
+}
+
+function extractGroundedFilters(query, knownBrands = []) {
+  return normalizeFilters({
+    ...extractSemanticFilters(query),
+    ...extractExplicitListingFilters(query, knownBrands),
+  });
+}
+
 function enforceExplicitListingFilters(filters, query, knownBrands) {
   return normalizeFilters({ ...filters, ...extractExplicitListingFilters(query, knownBrands) });
+}
+
+function enforceGroundedFilters(filters, query, knownBrands) {
+  return normalizeFilters({ ...filters, ...extractGroundedFilters(query, knownBrands) });
 }
 
 function sanitizeInterpretation(filters, query) {
@@ -224,6 +249,7 @@ function filterPrompt(query) {
     'Kembalikan hanya properti yang benar-benar tersirat: brand, category, condition, minPrice, maxPrice, size, minSize, maxSize, colors, excludeColors, preferColors.',
     'Warna yang disebut eksplisit masuk ke colors sebagai filter keras. Gunakan preferColors hanya untuk preferensi subjektif.',
     'Ukuran di atas X berarti minSize lebih besar dari X; ukuran di bawah X berarti maxSize lebih kecil dari X. Gunakan size hanya untuk ukuran persis.',
+    'Pahami kebutuhan penggunaan: olahraga/gym/latihan umumnya running, aktivitas harian/kampus umumnya casual, dan kebutuhan gabungan harian plus olahraga diprioritaskan ke running.',
     'Jangan menghasilkan SQL. Angka harga dalam rupiah. preferColors adalah ranking; excludeColors adalah larangan keras.',
     'Untuk frasa subjektif seperti warna kalem atau norak, interpretasikan sebagai preferensi warna secara wajar tanpa mengarang atribut listing.',
     `Query pengguna: ${JSON.stringify(query)}`,
@@ -377,11 +403,11 @@ async function fallbackSearch(query, limit, explicitFilters = {}, requireTextMat
 async function search(query, overrides, limit) {
   const brandRows = await Shoe.findAll({ attributes: ['brand'], group: ['brand'], raw: true });
   const knownBrands = brandRows.map(({ brand }) => brand);
-  const explicitFilters = extractExplicitListingFilters(query, knownBrands);
+  const groundedFilters = extractGroundedFilters(query, knownBrands);
   try {
-    const interpretedFilters = applyOverrides(enforceExplicitListingFilters(await interpret(query), query, knownBrands), overrides);
-    const hasExplicitFilters = hasMeaningfulFilters(explicitFilters) || hasMeaningfulFilters(overrides);
-    const shoes = hasExplicitFilters
+    const interpretedFilters = applyOverrides(enforceGroundedFilters(await interpret(query), query, knownBrands), overrides);
+    const hasGroundedFilters = hasMeaningfulFilters(groundedFilters) || hasMeaningfulFilters(overrides);
+    const shoes = hasGroundedFilters
       ? await queryByFilters(interpretedFilters, limit)
       : await fallbackSearch(query, limit, interpretedFilters, true);
     return {
@@ -391,7 +417,7 @@ async function search(query, overrides, limit) {
       meta: { totalItems: shoes.length, limit },
     };
   } catch {
-    const fallbackFilters = applyOverrides(explicitFilters, overrides);
+    const fallbackFilters = applyOverrides(groundedFilters, overrides);
     const shoes = await fallbackSearch(query, limit, fallbackFilters);
     return {
       mode: 'fallback', query, interpretedFilters: null,
@@ -414,7 +440,10 @@ module.exports = {
   normalizeQueryText,
   parseShoeSize,
   extractExplicitListingFilters,
+  extractSemanticFilters,
+  extractGroundedFilters,
   enforceExplicitListingFilters,
+  enforceGroundedFilters,
   sanitizeInterpretation,
   applyOverrides,
   validateOverrides,

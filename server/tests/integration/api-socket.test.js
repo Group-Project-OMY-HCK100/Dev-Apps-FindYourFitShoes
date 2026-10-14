@@ -221,6 +221,17 @@ test('REST marketplace dan Socket.io mengikuti alur kontrak utama', { skip: !sho
   assert.equal(colorSearch.body.data.results.some(({ shoe }) => shoe.id === newBalanceWhite.id), true);
   assert.equal(colorSearch.body.data.results.every(({ shoe }) => shoe.color === 'white'), true);
 
+  const useCaseSearch = await json('/ai/search', {
+    method: 'POST',
+    body: {
+      query: 'saya seringnya aktivitas harian hanya dari kos ke kampus saja. tapi butuh sepatu yang bisa digunakan sewaktu-waktu untuk olahraga, adakah rekomendasinya',
+      limit: 12,
+    },
+  });
+  assert.equal(useCaseSearch.status, 200);
+  assert.equal(useCaseSearch.body.data.results.length > 0, true);
+  assert.equal(useCaseSearch.body.data.results.every(({ shoe }) => shoe.category === 'running'), true);
+
   for (const irrelevantQuery of ['ronaldo', 'cari sepatu ocha']) {
     const irrelevant = await json('/ai/search', { method: 'POST', body: { query: irrelevantQuery, limit: 12 } });
     assert.equal(irrelevant.status, 200);
