@@ -649,3 +649,12 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .product-form-fields { margin: 0; padding: 0; border: 0; min-width: 0; }
 .product-form-fields:disabled input, .product-form-fields:disabled select,
 .product-form-fields:disabled textarea { background: #f4f4f4; color: #777; }
+
+/* Hasil pencarian AI */
+.home-ai-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: 22px; padding-top: 16px; border-top: 1px solid #ddd; }
+.home-ai-heading > span { font-size: 10px; font-weight: 700; letter-spacing: .7px; }
+.home-ai-heading > button { font-size: 11px; }
+.home-ai-limit { font-size: 10px; color: #777; line-height: 1.8; margin-top: 10px; }
+.home-ai-product { min-width: 0; }
+.home-ai-reason { margin-top: 9px; border-left: 2px solid #111; padding: 8px 10px; background: #f5f5f5; font-size: 11px; line-height: 1.8; color: #555; }
+.home-catalog .section-heading p { overflow-wrap: anywhere; }
