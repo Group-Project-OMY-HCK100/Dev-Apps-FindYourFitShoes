@@ -11,6 +11,8 @@ const {
   extractExplicitPriceFilters,
   enforceExplicitPriceFilters,
   extractExplicitListingFilters,
+  extractSemanticFilters,
+  extractGroundedFilters,
   buildFilterWhere,
   hasMeaningfulFilters,
 } = require('../../services/ai-service');
@@ -73,6 +75,15 @@ test('filter listing eksplisit mengenali brand, kondisi, rentang ukuran, dan war
   assert.deepEqual(extractExplicitListingFilters('cari sepatu diatas 40', brands), { minSize: 40.5 });
   assert.deepEqual(extractExplicitListingFilters('cari sepatu ukuran di bawah 42', brands), { maxSize: 41.5 });
   assert.deepEqual(extractExplicitListingFilters('cari sepatu warna putih', brands), { colors: ['white'] });
+});
+
+test('kebutuhan penggunaan diterjemahkan menjadi kategori tanpa pencocokan teks literal', () => {
+  const recommendation = 'saya seringnya aktivitas harian hanya dari kos ke kampus saja. tapi butuh sepatu yang bisa digunakan sewaktu-waktu untuk olahraga, adakah rekomendasinya';
+  assert.deepEqual(extractSemanticFilters(recommendation), { category: 'running' });
+  assert.deepEqual(extractSemanticFilters('sepatu untuk kuliah dan aktivitas harian'), { category: 'casual' });
+  assert.deepEqual(extractSemanticFilters('sepatu untuk wawancara kerja'), { category: 'formal' });
+  assert.deepEqual(extractSemanticFilters('ronaldo'), {});
+  assert.deepEqual(extractGroundedFilters('cari sepatu ocha', ['Nike', 'Adidas']), {});
 });
 
 test('filter query database memakai batas keras untuk seluruh atribut eksplisit', () => {
