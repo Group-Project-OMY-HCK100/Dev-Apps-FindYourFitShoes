@@ -58,10 +58,10 @@ async function socketAuth(socket, next) {
   }
 }
 
-async function broadcastPresence(io, userId, online, targetSocket, connectionCounts) {
+async function broadcastPresence(io, userId, online, targetSocket, connectionCounts, broadcast = true) {
   try {
     const contacts = await chatService.contactUserIds(userId);
-    contacts.forEach((contactId) => io.to(`user:${contactId}`).emit('presence:update', { userId, online }));
+    if (broadcast) contacts.forEach((contactId) => io.to(`user:${contactId}`).emit('presence:update', { userId, online }));
     if (targetSocket) {
       for (const contactId of contacts) {
         targetSocket.emit('presence:update', { userId: contactId, online: (connectionCounts.get(contactId) || 0) > 0 });
@@ -77,13 +77,6 @@ function registerSockets(io) {
   io.use(socketAuth);
   io.on('connection', async (socket) => {
     socket.listingSubscriptions = new Set();
-    if (socket.user) {
-      await socket.join(`user:${socket.user.id}`);
-      connectionCounts.set(socket.user.id, (connectionCounts.get(socket.user.id) || 0) + 1);
-      const remaining = socket.tokenExpiresAt - Date.now();
-      socket.expiryTimer = setTimeout(() => socket.disconnect(true), Math.max(0, remaining));
-      void broadcastPresence(io, socket.user.id, true, socket, connectionCounts);
-    }
 
     socket.on('catalog:join', withAck(async (payload) => {
       rejectUnknownFields(payload, []);
@@ -191,15 +184,33 @@ function registerSockets(io) {
       return { chatId, readCount: result.readCount, unreadCount: result.unreadCount };
     }));
 
+    socket.on('disconnecting', () => {
+      if (!socket.user) return;
+      for (const room of socket.rooms) {
+        if (room.startsWith('chat:')) socket.to(room).emit('typing:update', { chatId: room.slice(5), userId: socket.user.id, isTyping: false });
+      }
+    });
+
     socket.on('disconnect', () => {
       clearTimeout(socket.expiryTimer);
-      if (socket.user) {
+      if (socket.presenceCounted) {
         const remainingConnections = Math.max(0, (connectionCounts.get(socket.user.id) || 1) - 1);
         if (remainingConnections) connectionCounts.set(socket.user.id, remainingConnections);
         else connectionCounts.delete(socket.user.id);
-        void broadcastPresence(io, socket.user.id, remainingConnections > 0, null, connectionCounts);
+        if (!remainingConnections) void broadcastPresence(io, socket.user.id, false, null, connectionCounts);
       }
     });
+
+    if (socket.user) {
+      await socket.join(`user:${socket.user.id}`);
+      if (!socket.connected) return;
+      const previousConnections = connectionCounts.get(socket.user.id) || 0;
+      connectionCounts.set(socket.user.id, previousConnections + 1);
+      socket.presenceCounted = true;
+      const remaining = socket.tokenExpiresAt - Date.now();
+      socket.expiryTimer = setTimeout(() => socket.disconnect(true), Math.max(0, remaining));
+      void broadcastPresence(io, socket.user.id, true, socket, connectionCounts, previousConnections === 0);
+    }
   });
 }
 
