@@ -40,3 +40,33 @@ npm run build
 
 Uji manual dengan backend aktif: register, login, password salah, email duplikat, klik Chat penjual sebagai guest, refresh halaman privat, dan logout. Tampilan home/detail tetap bisa ditinjau saat backend tidak aktif. Folder server tidak diubah.
 
+
+## Redux: state autentikasi
+
+Implementasi mengikuti pola contoh di `Downloads/Redux/end`:
+
+- `src/app/store.js`: `configureStore` dengan reducer `auth`.
+- `src/features/auth/authSlice.js`: `createSlice`, action pending/success/failed, dan thunk `async/await` untuk login, register, pemeriksaan sesi, serta logout.
+- `src/main.jsx`: aplikasi dibungkus `Provider`.
+- `App.jsx` dan `AuthForm.jsx`: membaca state memakai `useSelector`, menjalankan action memakai `useDispatch`.
+
+State akun (`user`, `token`, loading, dan error) sekarang berasal dari Redux. Input form, foto, modal, dan state halaman tetap lokal. Token tetap memakai `sessionStorage` dengan key `access_token`. ChatProvider dan koneksi socket tetap menggunakan token serta callback logout dari App.
+
+Pembatalan request dan respons lama diperiksa berdasarkan request ID supaya request sebelum logout/login baru tidak mengubah sesi yang sudah berganti. Reducer hanya memperbarui state; Axios dan browser storage tetap di thunk.
+
+Tes regresi tanpa mendaftarkan akun sungguhan:
+
+```sh
+node --test tests/auth-redux.test.mjs
+```
+
+Dark/light mode belum dikerjakan pada tahap Redux ini.
+
+
+## React Context: light dan dark mode
+
+`ThemeProvider` di `src/components/ThemeProvider.jsx` menyimpan pilihan tema melalui `useState` dan membagikan `theme` serta `toggleTheme` menggunakan `ThemeContext`. Navbar mengaksesnya melalui `useTheme()` dari `src/lib/theme-context.js`.
+
+Tombol bulan/matahari mengganti tema untuk semua halaman lewat atribut `data-theme` pada `<html>` dan variabel warna di `src/index.css`. Default tetap light. Pilihan disimpan di `localStorage` dengan key `soleswap.theme`; `public/theme-init.js` menerapkannya sebelum React dimuat agar refresh tidak berkedip ke light mode. Jika penyimpanan browser tidak tersedia, toggle tetap berjalan.
+
+Context tema membungkus `App` di dalam Redux Provider. State autentikasi tetap di Redux dan ChatProvider tetap menangani socket seperti sebelumnya.

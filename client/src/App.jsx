@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import { BrowserRouter, Route, Routes } from "react-router";
-import axios from "axios";
-import baseUrl from "./constants/baseUrl";
+import { useDispatch, useSelector } from "react-redux";
+import { logoutAsync, restoreSessionAsync } from "./features/auth/authSlice";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
 import Home from "./pages/Home";
@@ -16,59 +16,21 @@ import NotFound from "./pages/NotFound";
 import ChatProvider from "./components/ChatProvider";
 
 function App() {
-  const [token, setToken] = useState(() => sessionStorage.getItem("access_token"));
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(Boolean(token));
-  const [error, setError] = useState("");
-  const [attempt, setAttempt] = useState(0);
+  const dispatch = useDispatch();
+  const { user, token, loading, error } = useSelector((state) => state.auth);
 
   const logout = useCallback(() => {
-    sessionStorage.removeItem("access_token");
-    sessionStorage.removeItem("soleswap.session");
-    setToken(null);
-    setUser(null);
-    setLoading(false);
-    setError("");
-  }, []);
+    dispatch(logoutAsync());
+  }, [dispatch]);
 
   useEffect(() => {
-    if (!token) return;
     const controller = new AbortController();
-    async function getProfile() {
-      try {
-        const { data } = await axios.get(`${baseUrl}/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-          signal: controller.signal,
-          timeout: 15000,
-        });
-        if (controller.signal.aborted) return;
-        setUser(data.data);
-        setError("");
-      } catch (problem) {
-        if (axios.isCancel(problem)) return;
-        if (problem.response?.status === 401) logout();
-        else setError(problem.response?.data?.error?.message || "Sesi belum bisa diperiksa. Pastikan server berjalan lalu coba lagi.");
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
-    }
-    getProfile();
+    dispatch(restoreSessionAsync(controller.signal));
     return () => controller.abort();
-  }, [token, attempt, logout]);
-
-  function handleAuthenticated(data) {
-    sessionStorage.setItem("access_token", data.accessToken);
-    sessionStorage.removeItem("soleswap.session");
-    setToken(data.accessToken);
-    setUser(data.user);
-    setError("");
-    setLoading(false);
-  }
+  }, [dispatch]);
 
   function retrySession() {
-    setLoading(true);
-    setError("");
-    setAttempt(attempt + 1);
+    dispatch(restoreSessionAsync());
   }
 
   return (
@@ -79,8 +41,8 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/shoes" element={<Home />} />
           <Route path="/shoes/:shoeId" element={<ProductDetail user={user} token={token} onUnauthorized={logout} />} />
-          <Route path="/login" element={<Login onAuthenticated={handleAuthenticated} user={user} checking={loading} />} />
-          <Route path="/register" element={<Register onAuthenticated={handleAuthenticated} user={user} checking={loading} />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
           <Route element={<ProtectedRoute user={user} loading={loading} error={error} onRetry={retrySession} />}>
             <Route path="/my-shoes" element={<MyShoes token={token} onUnauthorized={logout} />} />
             <Route path="/my-shoes/add" element={<AddProduct token={token} onUnauthorized={logout} />} />
