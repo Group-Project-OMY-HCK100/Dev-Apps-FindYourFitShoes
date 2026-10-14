@@ -14,6 +14,7 @@ const llmProvider = (process.env.LLM_PROVIDER || '').trim().toLowerCase();
 module.exports = {
   nodeEnv,
   port: parsePositiveInteger(process.env.PORT, 3000),
+  socketMaxConnectionsPerIp: parsePositiveInteger(process.env.SOCKET_MAX_CONNECTIONS_PER_IP, 20),
   clientOrigins: (process.env.CLIENT_ORIGINS || 'http://localhost:5173')
     .split(',')
     .map((origin) => origin.trim())

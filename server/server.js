@@ -23,14 +23,25 @@ function buildServer() {
 async function start() {
   if (env.jwtSecret.length < 32) throw new Error('JWT_SECRET wajib diisi dengan minimal 32 karakter');
   await sequelize.authenticate();
-  const { httpServer } = buildServer();
+  const { httpServer, io } = buildServer();
   httpServer.listen(env.port, () => console.log(`SoleSwap API berjalan di port ${env.port}`));
 
-  const shutdown = async (signal) => {
+  let shuttingDown = false;
+  const shutdown = (signal) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     console.log(`Menerima ${signal}, menutup server...`);
-    httpServer.close(async () => {
-      await sequelize.close();
-      process.exit(0);
+    const fallback = setTimeout(() => process.exit(1), 10000);
+    fallback.unref();
+    io.close(async () => {
+      try {
+        await sequelize.close();
+        clearTimeout(fallback);
+        process.exit(0);
+      } catch (error) {
+        console.error('Gagal menutup server:', error.message);
+        process.exit(1);
+      }
     });
   };
   process.once('SIGTERM', () => shutdown('SIGTERM'));

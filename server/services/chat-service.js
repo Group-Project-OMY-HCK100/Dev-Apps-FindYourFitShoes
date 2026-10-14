@@ -82,18 +82,23 @@ async function getOrCreate(shoeId, buyerId) {
 
 async function totalUnread(userId) {
   const chats = await Chat.findAll({
-    include: [{ model: Shoe, as: 'shoe', paranoid: false, required: true, attributes: ['userId'] }],
-    attributes: ['id', 'buyerId'],
+    where: { [Op.or]: [{ buyerId: userId }, { '$shoe.user_id$': userId }] },
+    include: chatInclude,
+    subQuery: false,
+    attributes: ['id'],
   });
-  const ids = chats.filter((chat) => isParticipant(chat, userId)).map((chat) => chat.id);
+  const ids = chats.map((chat) => chat.id);
   if (!ids.length) return 0;
   return Message.count({ where: { chatId: { [Op.in]: ids }, senderId: { [Op.ne]: userId }, readAt: null } });
 }
 
 async function contactUserIds(userId) {
-  const chats = await Chat.findAll({ include: chatInclude });
+  const chats = await Chat.findAll({
+    where: { [Op.or]: [{ buyerId: userId }, { '$shoe.user_id$': userId }] },
+    include: chatInclude,
+    subQuery: false,
+  });
   return [...new Set(chats
-    .filter((chat) => isParticipant(chat, userId))
     .map((chat) => (chat.buyerId === userId ? chat.shoe.userId : chat.buyerId)))];
 }
 

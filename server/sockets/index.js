@@ -4,6 +4,7 @@ const { Message, Shoe, User } = require('../models');
 const env = require('../config/env');
 const ApiError = require('../utils/api-error');
 const chatService = require('../services/chat-service');
+const { emitReadUpdated } = require('../services/realtime-events');
 const { assertUuid, rejectUnknownFields, validationError } = require('../validators/common');
 
 function socketError(error) {
@@ -25,19 +26,34 @@ function withAck(handler) {
     try { respond({ success: true, data: await handler(payload) }); } catch (error) {
       if (!error.status && process.env.NODE_ENV !== 'test') console.error(error);
       respond(socketError(error));
+      if (error.code === 'TOKEN_EXPIRED') error.socket.disconnect(true);
     }
   };
 }
 
 function requireAuthenticated(socket) {
   if (!socket.user) throw new ApiError(401, 'UNAUTHORIZED', 'Socket terautentikasi diperlukan');
+  if (socket.tokenExpiresAt <= Date.now()) {
+    const error = new ApiError(401, 'TOKEN_EXPIRED', 'Token socket telah kedaluwarsa');
+    error.socket = socket;
+    throw error;
+  }
 }
 
-function privateEventBudget(socket) {
+function scheduleExpiry(socket) {
+  if (!Number.isFinite(socket.tokenExpiresAt) || !socket.connected) return;
+  const remaining = socket.tokenExpiresAt - Date.now();
+  if (remaining <= 0) { socket.disconnect(true); return; }
+  socket.expiryTimer = setTimeout(() => scheduleExpiry(socket), Math.min(remaining, 2_147_483_647));
+}
+
+function eventBudget(socket, bucket = 'private', limit = 120) {
   const now = Date.now();
-  socket.privateEvents = (socket.privateEvents || []).filter((time) => now - time < 60000);
-  if (socket.privateEvents.length >= 120) throw new ApiError(429, 'RATE_LIMITED', 'Terlalu banyak event socket');
-  socket.privateEvents.push(now);
+  socket.eventBudgets ||= {};
+  const events = (socket.eventBudgets[bucket] || []).filter((time) => now - time < 60000);
+  socket.eventBudgets[bucket] = events;
+  if (events.length >= limit) throw new ApiError(429, 'RATE_LIMITED', 'Terlalu banyak event socket');
+  events.push(now);
 }
 
 async function socketAuth(socket, next) {
@@ -58,10 +74,10 @@ async function socketAuth(socket, next) {
   }
 }
 
-async function broadcastPresence(io, userId, online, targetSocket, connectionCounts) {
+async function broadcastPresence(io, userId, online, targetSocket, connectionCounts, broadcast = true) {
   try {
     const contacts = await chatService.contactUserIds(userId);
-    contacts.forEach((contactId) => io.to(`user:${contactId}`).emit('presence:update', { userId, online }));
+    if (broadcast) contacts.forEach((contactId) => io.to(`user:${contactId}`).emit('presence:update', { userId, online }));
     if (targetSocket) {
       for (const contactId of contacts) {
         targetSocket.emit('presence:update', { userId: contactId, online: (connectionCounts.get(contactId) || 0) > 0 });
@@ -74,28 +90,48 @@ async function broadcastPresence(io, userId, online, targetSocket, connectionCou
 
 function registerSockets(io) {
   const connectionCounts = new Map();
+  const ipCounts = new Map();
   io.use(socketAuth);
+  io.use((socket, next) => {
+    const forwarded = socket.handshake.headers['x-forwarded-for'];
+    const ip = env.nodeEnv === 'production' && typeof forwarded === 'string'
+      ? forwarded.split(',')[0].trim() : socket.handshake.address;
+    const count = ipCounts.get(ip) || 0;
+    if (count >= env.socketMaxConnectionsPerIp) {
+      const error = new Error('RATE_LIMITED');
+      error.data = { code: 'RATE_LIMITED', message: 'Batas koneksi socket per IP tercapai' };
+      return next(error);
+    }
+    ipCounts.set(ip, count + 1);
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      const remaining = (ipCounts.get(ip) || 1) - 1;
+      if (remaining) ipCounts.set(ip, remaining);
+      else ipCounts.delete(ip);
+    };
+    socket.once('disconnect', release);
+    socket.conn.once('close', release);
+    next();
+  });
   io.on('connection', async (socket) => {
     socket.listingSubscriptions = new Set();
-    if (socket.user) {
-      await socket.join(`user:${socket.user.id}`);
-      connectionCounts.set(socket.user.id, (connectionCounts.get(socket.user.id) || 0) + 1);
-      const remaining = socket.tokenExpiresAt - Date.now();
-      socket.expiryTimer = setTimeout(() => socket.disconnect(true), Math.max(0, remaining));
-      void broadcastPresence(io, socket.user.id, true, socket, connectionCounts);
-    }
 
     socket.on('catalog:join', withAck(async (payload) => {
+      eventBudget(socket, 'public', 60);
       rejectUnknownFields(payload, []);
       await socket.join('catalog');
       return { joined: true };
     }));
     socket.on('catalog:leave', withAck(async (payload) => {
+      eventBudget(socket, 'public', 60);
       rejectUnknownFields(payload, []);
       await socket.leave('catalog');
       return { joined: false };
     }));
     socket.on('listing:join', withAck(async (payload) => {
+      eventBudget(socket, 'public', 60);
       rejectUnknownFields(payload, ['shoeId']);
       const shoeId = assertUuid(payload.shoeId, 'shoeId');
       const shoe = await Shoe.findByPk(shoeId);
@@ -108,6 +144,7 @@ function registerSockets(io) {
       return { joined: true, shoeId };
     }));
     socket.on('listing:leave', withAck(async (payload) => {
+      eventBudget(socket, 'public', 60);
       rejectUnknownFields(payload, ['shoeId']);
       const shoeId = assertUuid(payload.shoeId, 'shoeId');
       await socket.leave(`shoes:${shoeId}`);
@@ -117,7 +154,7 @@ function registerSockets(io) {
 
     socket.on('chat:join', withAck(async (payload) => {
       requireAuthenticated(socket);
-      privateEventBudget(socket);
+      eventBudget(socket);
       rejectUnknownFields(payload, ['chatId']);
       const chatId = assertUuid(payload.chatId, 'chatId');
       try { await chatService.findParticipantChat(chatId, socket.user.id); } catch (error) {
@@ -129,7 +166,7 @@ function registerSockets(io) {
     }));
     socket.on('chat:leave', withAck(async (payload) => {
       requireAuthenticated(socket);
-      privateEventBudget(socket);
+      eventBudget(socket);
       rejectUnknownFields(payload, ['chatId']);
       const chatId = assertUuid(payload.chatId, 'chatId');
       await chatService.findParticipantChat(chatId, socket.user.id);
@@ -139,7 +176,7 @@ function registerSockets(io) {
 
     socket.on('message:send', withAck(async (payload) => {
       requireAuthenticated(socket);
-      privateEventBudget(socket);
+      eventBudget(socket);
       rejectUnknownFields(payload, ['chatId', 'clientMessageId', 'text']);
       const chatId = assertUuid(payload.chatId, 'chatId');
       const clientMessageId = assertUuid(payload.clientMessageId, 'clientMessageId');
@@ -168,7 +205,7 @@ function registerSockets(io) {
     for (const [incoming, isTyping] of [['typing:start', true], ['typing:stop', false]]) {
       socket.on(incoming, withAck(async (payload) => {
         requireAuthenticated(socket);
-        privateEventBudget(socket);
+        eventBudget(socket);
         rejectUnknownFields(payload, ['chatId']);
         const chatId = assertUuid(payload.chatId, 'chatId');
         await chatService.findParticipantChat(chatId, socket.user.id);
@@ -179,27 +216,41 @@ function registerSockets(io) {
 
     socket.on('chat:read', withAck(async (payload) => {
       requireAuthenticated(socket);
-      privateEventBudget(socket);
+      eventBudget(socket);
       rejectUnknownFields(payload, ['chatId', 'lastReadMessageId']);
       const chatId = assertUuid(payload.chatId, 'chatId');
       if (payload.lastReadMessageId !== undefined) assertUuid(payload.lastReadMessageId, 'lastReadMessageId');
       const result = await chatService.markRead(chatId, socket.user.id, payload.lastReadMessageId);
-      io.to(`chat:${chatId}`).emit('chat:read:updated', { chatId, readerId: socket.user.id, lastReadMessageId: result.lastReadMessageId });
-      io.to(`user:${socket.user.id}`).emit('unread:update', {
-        totalUnread: await chatService.totalUnread(socket.user.id), chatId, unreadCount: result.unreadCount,
-      });
+      await emitReadUpdated(io, { result, readerId: socket.user.id });
       return { chatId, readCount: result.readCount, unreadCount: result.unreadCount };
     }));
 
+    socket.on('disconnecting', () => {
+      if (!socket.user) return;
+      for (const room of socket.rooms) {
+        if (room.startsWith('chat:')) socket.to(room).emit('typing:update', { chatId: room.slice(5), userId: socket.user.id, isTyping: false });
+      }
+    });
+
     socket.on('disconnect', () => {
       clearTimeout(socket.expiryTimer);
-      if (socket.user) {
+      if (socket.presenceCounted) {
         const remainingConnections = Math.max(0, (connectionCounts.get(socket.user.id) || 1) - 1);
         if (remainingConnections) connectionCounts.set(socket.user.id, remainingConnections);
         else connectionCounts.delete(socket.user.id);
-        void broadcastPresence(io, socket.user.id, remainingConnections > 0, null, connectionCounts);
+        if (!remainingConnections) void broadcastPresence(io, socket.user.id, false, null, connectionCounts);
       }
     });
+
+    if (socket.user) {
+      await socket.join(`user:${socket.user.id}`);
+      if (!socket.connected) return;
+      const previousConnections = connectionCounts.get(socket.user.id) || 0;
+      connectionCounts.set(socket.user.id, previousConnections + 1);
+      socket.presenceCounted = true;
+      scheduleExpiry(socket);
+      void broadcastPresence(io, socket.user.id, true, socket, connectionCounts, previousConnections === 0);
+    }
   });
 }
 
