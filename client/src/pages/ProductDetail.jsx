@@ -1,61 +1,87 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
+import axios from "axios";
+import baseUrl from "../constants/baseUrl";
 import Icon from "../components/Icon";
-import ProductCard from "../components/ProductCard";
-import { chats } from "../data/chats";
-import { products, formatPrice, shoeName, shoeImages, conditions, categories, colors } from "../data/products";
+import { conditions, categories, colors } from "../data/products";
+
+function ProductPhoto({ src, alt }) {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) {
+    return <div className="detail-image-fallback" role="img" aria-label={`${alt}, foto tidak tersedia`}><Icon name="shoe" size={48} /><span>Foto tidak tersedia</span></div>;
+  }
+  return <img src={src} alt={alt} onError={() => setFailed(true)} />;
+}
 
 function ProductContent({ product, user }) {
   const [activePhoto, setActivePhoto] = useState(0);
-  const [notice, setNotice] = useState("");
-  const images = shoeImages(product);
+  const images = [product.imgUrl1, product.imgUrl2, product.imgUrl3, product.imgUrl4, product.imgUrl5].filter(Boolean);
   const own = user?.id === product.seller.id;
   const sold = product.status === "sold";
-  const exampleChat = chats.find((chat) => chat.shoe.id === product.id && !chat.shoe.isDeleted);
-  const chatPath = `/chats/${exampleChat.id}`;
-  const otherProducts = products.filter((item) => item.id !== product.id);
+  const name = `${product.brand} ${product.article}`;
+  const price = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(product.price);
 
   return (
     <div className="detail-page">
       <nav className="breadcrumbs" aria-label="Breadcrumb">
         <Link to="/">Home</Link><span>/</span>
-        <Link to="/">Sepatu preloved</Link><span>/</span>
-        <span aria-current="page">{shoeName(product)}</span>
+        <Link to="/shoes">Sepatu preloved</Link><span>/</span>
+        <span aria-current="page">{name}</span>
       </nav>
 
       <section className="detail-layout">
-        <div className="detail-gallery"><div className="detail-photo">
-          <img src={images[activePhoto]} alt={shoeName(product)} />
-          <span className="condition">{conditions[product.condition]}</span>
-          <span className="detail-photo-label">FOTO {activePhoto + 1} / {images.length}</span>
-        </div><div className="gallery-thumbnails">{images.map((url, index) => <button aria-label={`Lihat foto ${index + 1}`} aria-pressed={activePhoto === index} className={activePhoto === index ? "active" : ""} key={url} onClick={() => setActivePhoto(index)}><img src={url} alt={`Foto ${index + 1}`} /></button>)}</div><p className="photo-help">Galeri mendukung hingga 5 foto. Listing contoh ini memiliki {images.length} foto.</p></div>
+        <div className="detail-gallery">
+          <div className="detail-photo">
+            <ProductPhoto key={images[activePhoto] || "no-photo"} src={images[activePhoto]} alt={`${name}, foto ${activePhoto + 1}`} />
+            <span className="condition">{conditions[product.condition] || product.condition}</span>
+            {images.length > 0 && <span className="detail-photo-label">FOTO {activePhoto + 1} / {images.length}</span>}
+          </div>
+          {images.length > 1 && (
+            <div className="gallery-thumbnails" aria-label="Pilih foto sepatu">
+              {images.map((url, index) => (
+                <button key={`${url}-${index}`} type="button" aria-label={`Lihat foto ${index + 1} dari ${images.length}`} aria-pressed={activePhoto === index} className={activePhoto === index ? "active" : ""} onClick={() => setActivePhoto(index)}>
+                  <ProductPhoto src={url} alt="" />
+                </button>
+              ))}
+            </div>
+          )}
+          <p className="detail-photo-note">Foto dari penjual. Tanyakan detail tambahan melalui chat.</p>
+        </div>
 
         <div className="detail-info">
           <span className="eyebrow">{product.brand} / PRELOVED</span>
-          <h1>{shoeName(product)}</h1>
+          <h1>{name}</h1>
           <span className={`status-label ${product.status}`}>{sold ? "Terjual" : "Tersedia"}</span>
-          <p className="detail-price">{formatPrice(product.price)}</p>
+          <p className="detail-price">{price}</p>
 
           <dl className="detail-specs">
             <div><dt>Ukuran</dt><dd>EU {product.size}</dd></div>
-            <div><dt>Kondisi</dt><dd>{conditions[product.condition]}</dd></div>
-            <div><dt>Kategori</dt><dd>{categories[product.category]}</dd></div><div><dt>Warna</dt><dd>{colors[product.color]}</dd></div>
+            <div><dt>Kondisi</dt><dd>{conditions[product.condition] || product.condition}</dd></div>
+            <div><dt>Kategori</dt><dd>{categories[product.category] || product.category}</dd></div>
+            <div><dt>Warna</dt><dd>{colors[product.color] || product.color}</dd></div>
           </dl>
-          <p className="detail-size-note">Ukuran sepatu ini EU {product.size}. Tanyakan panjang insole ke penjual untuk memastikan ukuran.</p>
+          <p className="detail-size-note">Pastikan ukurannya pas. Tanyakan panjang insole dan kondisi bagian sol kepada penjual.</p>
 
           <div className="detail-actions">
-            {own ? <Link className="button dark" to={`/my-shoes/${product.id}/edit`}>Edit listing<Icon name="arrow" size={18} /></Link> : sold ? <button className="button dark" disabled>Sepatu sudah terjual</button> : <Link to={chatPath} className="button dark"><Icon name="chat" size={18} />Chat penjual<Icon name="arrow" size={18} /></Link>}
+            {own ? (
+              <Link className="button dark" to={`/my-shoes/${product.id}/edit`}>Edit listing<Icon name="arrow" size={18} /></Link>
+            ) : sold ? (
+              <button className="button dark" disabled>Sepatu sudah terjual</button>
+            ) : (
+              <Link to="/chats" state={{ shoe: product }} className="button dark"><Icon name="chat" size={18} />Chat penjual<Icon name="arrow" size={18} /></Link>
+            )}
           </div>
-          {own && <button className="button outline owner-status" onClick={() => setNotice(`Preview: status akan menjadi ${sold ? "tersedia" : "terjual"}. Data contoh tetap sama.`)}>{sold ? "Jadikan tersedia" : "Tandai terjual"}</button>}
-          {sold && <p className="notice">Listing tetap bisa dilihat. Chat baru tidak tersedia; percakapan lama bisa dibuka melalui inbox.</p>}
-          {notice && <p className="notice" role="status">{notice}</p>}
-          <p className="detail-preview-note">Template detail dan chat memakai data contoh, belum terhubung ke server.</p>
+          {sold ? (
+            <p className="notice">Sepatu ini sudah terjual. Chat baru tidak tersedia; percakapan yang sudah ada tetap bisa dibuka melalui inbox.</p>
+          ) : !own && (
+            <p className="detail-action-note">{user ? "Diskusikan harga dan rencana COD langsung dengan penjual." : "Masuk untuk menghubungi penjual. Kamu tetap bisa melihat detail sepatu tanpa akun."}</p>
+          )}
 
           <section className="detail-seller" aria-label="Informasi penjual">
             <span className="avatar">{product.seller.name.charAt(0)}</span>
-            <div><small>DIJUAL OLEH</small><h2>{product.seller.name}</h2><p>{own ? "Listing milikmu" : "Pemilik listing"}</p></div>
-            
+            <div><small>DIJUAL OLEH</small><h2>{product.seller.name}</h2><p>{own ? "Ini listing milikmu" : "Pemilik listing"}</p></div>
           </section>
+          <p className="detail-posted">Diposting {new Date(product.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</p>
         </div>
       </section>
 
@@ -63,36 +89,70 @@ function ProductContent({ product, user }) {
         <section className="detail-description">
           <h2>DESKRIPSI PRODUK</h2>
           <p>{product.description}</p>
-          <p className="detail-description-note">Deskripsi contoh untuk tampilan. Foto dan detail kondisi nantinya diisi oleh penjual.</p>
         </section>
         <aside className="detail-buying-note">
           <h2>SEBELUM MEMBELI</h2>
-          <p>Minta foto detail bagian sol, insole, dan kekurangan sepatu. Konfirmasi ukuran, kelengkapan, serta pengiriman langsung dengan penjual.</p>
+          <p>Minta foto detail bagian sol, insole, dan kekurangan sepatu. Konfirmasi ukuran, kelengkapan, serta rencana COD langsung dengan penjual.</p>
         </aside>
       </div>
-
-      <section className="detail-related">
-        <div className="section-heading"><h2>SEPATU LAINNYA</h2><Link to="/" className="text-link">Lihat semua<Icon name="arrow" size={16} /></Link></div>
-        <div className="product-grid">{otherProducts.map((item) => <ProductCard key={item.id} product={item} />)}</div>
-      </section>
+      <div className="detail-return"><Link className="text-link" to="/shoes">← Kembali ke koleksi sepatu</Link></div>
     </div>
   );
 }
 
 export default function ProductDetail({ user }) {
   const { shoeId } = useParams();
-  const product = products.find((item) => item.id === shoeId);
+  const [result, setResult] = useState(null);
+  const [attempt, setAttempt] = useState(0);
 
-  if (!product) {
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function getShoe() {
+      try {
+        const { data } = await axios.get(`${baseUrl}/shoes/${shoeId}`, {
+          signal: controller.signal,
+          timeout: 15000,
+        });
+        if (controller.signal.aborted) return;
+        setResult({ shoeId, attempt, product: data.data });
+      } catch (error) {
+        if (axios.isCancel(error)) return;
+        setResult({
+          shoeId,
+          attempt,
+          status: error.response?.status,
+          error: error.response?.data?.error?.message || "Detail belum bisa dimuat. Periksa koneksi atau coba lagi sebentar.",
+        });
+      }
+    }
+
+    getShoe();
+    return () => controller.abort();
+  }, [shoeId, attempt]);
+
+  const current = result?.shoeId === shoeId && result.attempt === attempt ? result : null;
+
+  if (!current) {
     return (
-      <section className="empty-state">
-        <span className="eyebrow">PRODUK TIDAK DITEMUKAN</span>
-        <h1>Sepatu ini belum tersedia.</h1>
-        <p>Kembali ke katalog untuk melihat sepatu lainnya.</p>
-        <Link to="/" className="button dark">Lihat koleksi<Icon name="arrow" /></Link>
+      <section className="detail-page detail-loading" role="status" aria-busy="true">
+        <p>Memuat detail sepatu…</p>
+        <div className="detail-loading-grid" aria-hidden="true"><div className="detail-loading-photo" /><div className="detail-loading-info">{[1, 2, 3, 4, 5].map((item) => <span key={item} />)}</div></div>
       </section>
     );
   }
 
-  return <ProductContent key={product.id} product={product} user={user} />;
+  if (current.error) {
+    const notFound = current.status === 404 || current.status === 422;
+    return (
+      <section className="empty-state detail-error">
+        <span className="eyebrow">{notFound ? "LISTING TIDAK TERSEDIA" : "GAGAL MEMUAT DETAIL"}</span>
+        <h1>{notFound ? "Sepatu ini tidak ditemukan." : "Detail belum bisa ditampilkan."}</h1>
+        <p role="alert">{notFound ? "Listing mungkin sudah dihapus atau tautannya tidak valid. Coba lihat koleksi lainnya." : current.error}</p>
+        <div>{!notFound && <button className="button dark" onClick={() => setAttempt(attempt + 1)}>Coba lagi<Icon name="arrow" size={17} /></button>}<Link className={`button ${notFound ? "dark" : "outline"}`} to="/shoes">Kembali ke koleksi</Link></div>
+      </section>
+    );
+  }
+
+  return <ProductContent key={current.product.id} product={current.product} user={user} />;
 }

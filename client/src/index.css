@@ -616,3 +616,32 @@ button:disabled { cursor: not-allowed; opacity: .45; }
   .home-sort { flex-direction: row; align-items: center; justify-content: space-between; }
   .home-sort select { min-height: 40px; }
 }
+
+/* Detail sepatu dari backend */
+.detail-image-fallback { height: 100%; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 15px; background: #eee; color: #777; }
+.detail-image-fallback > span { font-size: 11px; }
+.gallery-thumbnails { flex-wrap: wrap; }
+.gallery-thumbnails .detail-image-fallback > svg { width: 25px; height: 25px; }
+.gallery-thumbnails .detail-image-fallback > span { display: none; }
+.detail-photo-note, .detail-action-note, .detail-posted { font-size: 11px; color: #777; line-height: 1.8; margin-top: 13px; }
+.detail-description > p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.detail-seller h2 { overflow-wrap: anywhere; }
+.detail-info h1 { overflow-wrap: anywhere; }
+.detail-return { display: flex; margin-top: 30px; padding-top: 22px; border-top: 1px solid #ddd; }
+.detail-loading { padding-top: 30px; }
+.detail-loading > p { font-size: 12px; color: #777; margin-bottom: 22px; }
+.detail-loading-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 55px; }
+.detail-loading-photo { aspect-ratio: 1; background: #eee; }
+.detail-loading-info { padding: 20px 0; }
+.detail-loading-info > span { display: block; height: 18px; background: #eee; width: 80%; margin-bottom: 25px; }
+.detail-loading-info > span:first-child { width: 35%; height: 10px; }
+.detail-loading-info > span:nth-child(2) { height: 45px; width: 100%; }
+.detail-loading-info > span:nth-child(3) { width: 45%; height: 30px; }
+.detail-loading-info > span:last-child { margin-top: 45px; height: 48px; width: 100%; }
+.detail-error > div { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; }
+@media (max-width: 1100px) { .detail-loading-grid { gap: 30px; } }
+@media (max-width: 700px) {
+  .detail-loading-grid { grid-template-columns: 1fr; gap: 20px; }
+  .detail-loading-info { padding: 0; }
+  .detail-posted { font-size: 10px; }
+}
