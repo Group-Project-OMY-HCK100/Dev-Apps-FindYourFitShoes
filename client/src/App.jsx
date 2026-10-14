@@ -80,7 +80,7 @@ function App() {
           <Route path="/login" element={<Login onAuthenticated={handleAuthenticated} user={user} checking={loading} />} />
           <Route path="/register" element={<Register onAuthenticated={handleAuthenticated} user={user} checking={loading} />} />
           <Route element={<ProtectedRoute user={user} loading={loading} error={error} onRetry={retrySession} />}>
-            <Route path="/my-shoes" element={<MyShoes />} />
+            <Route path="/my-shoes" element={<MyShoes token={token} onUnauthorized={logout} />} />
             <Route path="/my-shoes/add" element={<AddProduct token={token} onUnauthorized={logout} />} />
             <Route path="/my-shoes/:shoeId/edit" element={<EditProduct user={user} token={token} onUnauthorized={logout} />} />
             <Route path="/chats" element={<Chat />} />

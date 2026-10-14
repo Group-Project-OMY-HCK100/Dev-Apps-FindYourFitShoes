@@ -19,7 +19,7 @@ export default function Home() {
     async function getShoes() {
       try {
         const { data } = await axios.get(`${baseUrl}/shoes`, {
-          params: { page, limit: 12, sort },
+          params: { page, limit: 12, sort, status: "all" },
           signal: controller.signal,
           timeout: 15000,
         });
