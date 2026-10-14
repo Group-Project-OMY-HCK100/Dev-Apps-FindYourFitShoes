@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router";
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router";
 import axios from "axios";
 import baseUrl from "../constants/baseUrl";
 import Icon from "../components/Icon";
@@ -13,13 +13,36 @@ function ProductPhoto({ src, alt }) {
   return <img src={src} alt={alt} onError={() => setFailed(true)} />;
 }
 
-function ProductContent({ product, user }) {
+function ProductContent({ product, user, token, onUnauthorized }) {
+  const navigate = useNavigate();
+  const [startingChat, setStartingChat] = useState(false);
+  const [chatError, setChatError] = useState("");
+  const chatRequest = useRef(null);
+  useEffect(() => () => chatRequest.current?.abort(), []);
   const [activePhoto, setActivePhoto] = useState(0);
   const images = [product.imgUrl1, product.imgUrl2, product.imgUrl3, product.imgUrl4, product.imgUrl5].filter(Boolean);
   const own = user?.id === product.seller.id;
   const sold = product.status === "sold";
   const name = `${product.brand} ${product.article}`;
   const price = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(product.price);
+
+  async function startChat() {
+    if (!user || !token) { navigate("/login"); return; }
+    setStartingChat(true);
+    setChatError("");
+    const controller = new AbortController();
+    chatRequest.current = controller;
+    try {
+      const { data } = await axios.post(`${baseUrl}/chats`, { shoeId: product.id }, { headers: { Authorization: `Bearer ${token}` }, timeout: 15000, signal: controller.signal });
+      if (controller.signal.aborted) return;
+      navigate(`/chats/${data.data.id}`);
+    } catch (problem) {
+      if (axios.isCancel(problem)) return;
+      if (problem.response?.status === 401) onUnauthorized();
+      const messages = { SELF_CHAT_NOT_ALLOWED: "Kamu tidak bisa menghubungi diri sendiri.", SHOE_NOT_AVAILABLE: "Sepatu sudah tidak tersedia untuk chat baru.", SHOE_NOT_FOUND: "Listing sepatu sudah tidak ditemukan." };
+      setChatError(messages[problem.response?.data?.error?.code] || problem.response?.data?.error?.message || "Chat belum bisa dibuat. Coba lagi.");
+    } finally { setStartingChat(false); }
+  }
 
   return (
     <div className="detail-page">
@@ -68,9 +91,10 @@ function ProductContent({ product, user }) {
             ) : sold ? (
               <button className="button dark" disabled>Sepatu sudah terjual</button>
             ) : (
-              <Link to="/chats" state={{ shoe: product }} className="button dark"><Icon name="chat" size={18} />Chat penjual<Icon name="arrow" size={18} /></Link>
+              <button disabled={startingChat} onClick={startChat} className="button dark"><Icon name="chat" size={18} />{startingChat ? "Membuka chat…" : "Chat penjual"}<Icon name="arrow" size={18} /></button>
             )}
           </div>
+          {chatError && <p className="notice" role="alert">{chatError}</p>}
           {sold ? (
             <p className="notice">Sepatu ini sudah terjual. Chat baru tidak tersedia; percakapan yang sudah ada tetap bisa dibuka melalui inbox.</p>
           ) : !own && (
@@ -100,7 +124,7 @@ function ProductContent({ product, user }) {
   );
 }
 
-export default function ProductDetail({ user }) {
+export default function ProductDetail({ user, token, onUnauthorized }) {
   const { shoeId } = useParams();
   const [result, setResult] = useState(null);
   const [attempt, setAttempt] = useState(0);
@@ -154,5 +178,5 @@ export default function ProductDetail({ user }) {
     );
   }
 
-  return <ProductContent key={current.product.id} product={current.product} user={user} />;
+  return <ProductContent key={`${current.product.id}:${token || "guest"}`} product={current.product} user={user} token={token} onUnauthorized={onUnauthorized} />;
 }
