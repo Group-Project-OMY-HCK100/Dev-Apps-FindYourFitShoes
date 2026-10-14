@@ -2,20 +2,20 @@
   <defs>
     <!-- Background Gradient (Sneaker culture dark mode aesthetic) -->
     <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0F172A" />
-      <stop offset="100%" stop-color="#1E293B" />
+      <stop offset="0%" stop-color="#111111" />
+      <stop offset="100%" stop-color="#222222" />
     </linearGradient>
 
     <!-- Vibrant Accent Gradient (Swap & Energy) -->
     <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#FF5E62" />
-      <stop offset="100%" stop-color="#FF9966" />
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#DDDDDD" />
     </linearGradient>
 
     <!-- Clean Shoe White Gradient -->
     <linearGradient id="shoeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" stop-color="#FFFFFF" />
-      <stop offset="100%" stop-color="#CBD5E1" />
+      <stop offset="100%" stop-color="#DDDDDD" />
     </linearGradient>
   </defs>
 
@@ -45,9 +45,9 @@
     <path d="M 20 120 C 35 90, 60 50, 100 45 C 120 42, 140 55, 160 55 C 190 55, 230 30, 250 45 C 270 60, 260 90, 260 90 C 240 95, 200 100, 150 100 C 90 100, 50 90, 20 120 Z" fill="url(#shoeGrad)" />
 
     <!-- Laces Detail -->
-    <path d="M 105 48 L 132 72 M 125 43 L 152 67" stroke="#0F172A" stroke-width="6" stroke-linecap="round" />
+    <path d="M 105 48 L 132 72 M 125 43 L 152 67" stroke="#111111" stroke-width="6" stroke-linecap="round" />
     
     <!-- Dynamic Branding Swoosh Accent -->
-    <path d="M 55 85 C 95 95, 175 80, 215 60" stroke="#FF5E62" stroke-width="6" stroke-linecap="round" fill="none" opacity="0.9" />
+    <path d="M 55 85 C 95 95, 175 80, 215 60" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" fill="none" opacity="0.9" />
   </g>
 </svg>

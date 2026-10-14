@@ -1,16 +1,42 @@
-# React + Vite
+# Sole Swap — Client
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + Vite + React Router. Pola pengerjaan mengikuti I-ProjectMike: Axios langsung di komponen, async/await, input useState/onChange, dan constants/baseUrl.js. Tanpa folder api/utils, custom hook request, Redux, atau React Context.
 
-Currently, two official plugins are available:
+## Menjalankan
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```sh
+npm ci
+npm run dev
+```
 
-## React Compiler
+API default http://localhost:3000. Untuk URL berbeda, salin .env.example ke .env.local, isi VITE_API_URL, lalu restart Vite. Server dijalankan terpisah oleh tim backend.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Scope: register dan login saja
 
-## Expanding the ESLint configuration
+Hanya tiga endpoint yang dipakai:
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- POST /register: mendaftar dan langsung menerima sesi dari backend.
+- POST /login: masuk dengan email/password.
+- GET /auth/me: memeriksa token saat refresh.
+
+Token disimpan di sessionStorage (access_token). App.jsx meneruskan akun melalui props. Logout menghapus token; respons 401 saat pengecekan sesi mengembalikan akun menjadi guest. Form memiliki loading, error server, dan pencegahan submit berulang.
+
+Home, katalog, detail, My Shoes, tambah/edit produk, dan chat tetap template dengan data contoh lokal. Tidak ada request sepatu, chat, AI, CRUD, ataupun socket. Data di src/data hanya untuk menampilkan desain; tidak tersimpan di backend.
+
+Guest dapat membuka /, /shoes, dan /shoes/:shoeId. Chat dan halaman pengelolaan sepatu memakai ProtectedRoute. Saat guest membuka chat, diarahkan ke login dan kembali ke tujuan setelah berhasil masuk/register. Link antar login/register mempertahankan tujuan; redirect hanya menerima route internal yang dikenali.
+
+## Routing di App.jsx
+
+- Publik: /, /shoes, /shoes/:shoeId, /login, /register.
+- Login: /my-shoes, /my-shoes/add, /my-shoes/:shoeId/edit, /chats, /chats/:chatId.
+- Halaman lain: 404.
+
+## Pemeriksaan
+
+```sh
+npm run lint
+npm run build
+```
+
+Uji manual dengan backend aktif: register, login, password salah, email duplikat, klik Chat penjual sebagai guest, refresh halaman privat, dan logout. Tampilan home/detail tetap bisa ditinjau saat backend tidak aktif. Folder server tidak diubah.
+
