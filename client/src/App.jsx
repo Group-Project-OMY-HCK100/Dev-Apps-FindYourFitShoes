@@ -13,6 +13,7 @@ import AddProduct from "./pages/AddProduct";
 import EditProduct from "./pages/EditProduct";
 import Chat from "./pages/Chat";
 import NotFound from "./pages/NotFound";
+import ChatProvider from "./components/ChatProvider";
 
 function App() {
   const [token, setToken] = useState(() => sessionStorage.getItem("access_token"));
@@ -72,23 +73,25 @@ function App() {
 
   return (
     <BrowserRouter>
+      <ChatProvider key={token || "guest"} token={token} onUnauthorized={logout}>
       <Routes>
         <Route element={<Layout user={user} loading={loading} onLogout={logout} />}>
           <Route path="/" element={<Home />} />
           <Route path="/shoes" element={<Home />} />
-          <Route path="/shoes/:shoeId" element={<ProductDetail user={user} />} />
+          <Route path="/shoes/:shoeId" element={<ProductDetail user={user} token={token} onUnauthorized={logout} />} />
           <Route path="/login" element={<Login onAuthenticated={handleAuthenticated} user={user} checking={loading} />} />
           <Route path="/register" element={<Register onAuthenticated={handleAuthenticated} user={user} checking={loading} />} />
           <Route element={<ProtectedRoute user={user} loading={loading} error={error} onRetry={retrySession} />}>
             <Route path="/my-shoes" element={<MyShoes token={token} onUnauthorized={logout} />} />
             <Route path="/my-shoes/add" element={<AddProduct token={token} onUnauthorized={logout} />} />
             <Route path="/my-shoes/:shoeId/edit" element={<EditProduct user={user} token={token} onUnauthorized={logout} />} />
-            <Route path="/chats" element={<Chat />} />
-            <Route path="/chats/:chatId" element={<Chat />} />
+            <Route path="/chats" element={<Chat user={user} />} />
+            <Route path="/chats/:chatId" element={<Chat user={user} />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>
+      </ChatProvider>
     </BrowserRouter>
   );
 }

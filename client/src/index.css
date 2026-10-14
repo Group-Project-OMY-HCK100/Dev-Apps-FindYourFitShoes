@@ -214,6 +214,13 @@ form input::placeholder, form textarea::placeholder { color: #888; font-weight: 
 .message p { font-size: 12px; line-height: 1.8; }
 .message > span { display: block; text-align: right; font-size: 9px; color: #777; margin-top: 5px; }
 .message.me > span { color: #bbb; }
+.message p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.message.sending { opacity: .65; }
+.message.failed { border-color: #b43d35; }
+.message > small { display: block; font-size: 10px; margin-top: 8px; }
+.message-retry { display: block; color: inherit; text-decoration: underline; margin-top: 8px; font-size: 11px; }
+.header nav .unread-badge { min-width: 20px; }
+.chat-window .messages { max-height: 65vh; overflow-y: auto; }
 .chat-composer { display: flex; gap: 12px; padding: 17px 23px; border-top: 1px solid var(--line); }
 .chat-composer .button { padding: 12px; min-width: 44px; }
 .chat-notice { font-size: 10px; color: #666; padding: 0 23px 17px; }
