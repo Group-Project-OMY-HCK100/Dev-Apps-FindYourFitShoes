@@ -1,16 +1,63 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import Icon from "./Icon";
+import { categories, conditions, colors, shoeImages } from "../data/products";
+
 export default function ProductForm({ product }) {
-  const [preview, setPreview] = useState(product?.image || "");
-  const [notice, setNotice] = useState(false);
-  function selectPhoto(event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/") || file.size > 5 * 1024 * 1024) { setNotice("Pilih gambar berukuran maksimal 5 MB."); return; }
-    const reader = new FileReader();
-    reader.onload = () => { setPreview(reader.result); setNotice(false); };
-    reader.readAsDataURL(file);
+  const [photos, setPhotos] = useState(() => product ? shoeImages(product).map((url) => ({ id: url, url })) : []);
+  const [notice, setNotice] = useState("");
+  const [reading, setReading] = useState(false);
+
+  async function selectPhotos(event) {
+    const files = Array.from(event.target.files || []);
+    event.target.value = "";
+    if (!files.length) return;
+    if (files.length + photos.length > 5) { setNotice("Maksimal 5 foto termasuk foto lama yang dipertahankan."); return; }
+    if (files.some((file) => !["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024)) { setNotice("Gunakan JPG, PNG, atau WebP, maksimal 5 MB per foto."); return; }
+    setReading(true);
+    setNotice("");
+    try {
+      const previews = await Promise.all(files.map((file) => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve({ id: crypto.randomUUID(), url: reader.result });
+        reader.onerror = () => reject(new Error("Foto tidak bisa dibaca. Coba pilih lagi."));
+        reader.readAsDataURL(file);
+      })));
+      setPhotos((current) => [...current, ...previews]);
+    } catch (error) { setNotice(error.message); }
+    finally { setReading(false); }
   }
-  return <section className="form-page"><Link to="/" className="back-link">← Kembali ke explore</Link><div className="page-heading"><span className="eyebrow">{product ? "EDIT PRODUK" : "JUAL SEPATU"}</span><h1>{product ? "Edit sepatu kamu." : "Tambahkan sepatu."}</h1><p>{product ? "Perbarui detail supaya calon pembeli lebih mudah mengenal sepatumu." : "Tambahkan foto, kondisi, dan harga sepatu yang ingin kamu jual."}</p></div><form className="product-form" onSubmit={event => { event.preventDefault(); setNotice("Preview saja. Produk belum disimpan atau dikirim ke backend."); }}><div className="form-main"><section className="form-panel"><h2><span>01</span> Foto sepatu</h2><p>Foto yang jelas bikin sepatumu lebih mudah dilirik.</p><label className="upload-zone">{preview ? <img src={preview} alt="Preview foto sepatu" /> : <><span className="upload-icon"><Icon name="upload" size={28} /></span><strong>Klik untuk pilih foto</strong><span>JPG, PNG atau WebP · Maks. 5 MB</span></>}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={selectPhoto} /><span className="upload-caption">{preview ? "Klik untuk ganti foto" : "Foto hanya untuk preview lokal"}</span></label></section><section className="form-panel"><h2><span>02</span> Detail sepatu</h2><div className="field-grid"><label className="span-two">Nama produk<input required defaultValue={product?.name} placeholder="Contoh: Nike Air Force 1 '07 White" /></label><label>Merek<select required defaultValue={product?.brand || ""}><option value="" disabled>Pilih merek</option>{["Nike", "Adidas", "New Balance", "Converse", "Vans", "Lainnya"].map(brand => <option key={brand}>{brand}</option>)}</select></label><label>Ukuran (EU)<input required type="number" min="20" max="55" defaultValue={product?.size} placeholder="42" /></label><label>Kondisi<select defaultValue={product?.condition || "Like new"}><option>Like new</option><option>Good</option><option>Fair</option></select></label><label>Harga (Rp)<input required type="number" min="1000" step="1000" defaultValue={product?.price} placeholder="650000" /></label><label className="span-two">Lokasi<input required defaultValue={product?.city} placeholder="Contoh: Jakarta Selatan" /></label><label className="span-two">Deskripsi<textarea required rows={5} defaultValue={product ? "Sepatu original, jarang dipakai. Kondisi terawat, sol masih bagus. Ukuran sesuai label. Silakan chat untuk detail foto dan kondisi." : ""} placeholder="Ceritakan kondisi, kelengkapan, lama pemakaian, dan detail lainnya…" /></label></div></section></div><aside><section className="tips-panel"><span className="round-icon"><Icon name="shoe" size={25} /></span><h3>Bikin listing yang menarik.</h3><p>Detail kecil membantu pembeli menemukan pasangan yang tepat.</p><ul><li>Foto dari beberapa sisi dengan cahaya yang cukup.</li><li>Jelaskan kondisi asli, termasuk kekurangannya.</li><li>Pastikan ukuran dan harga sudah sesuai.</li></ul><div className="tip-note">Cantumkan kelengkapan seperti box, nota, atau tali tambahan jika tersedia.</div></section><div className="form-panel form-submit"><span className="preview-tag">MODE TEMPLATE</span><p>Form ini belum terhubung ke backend.</p><button className="button dark full">{product ? "Simpan perubahan" : "Tambahkan produk"}<Icon name="arrow" size={18} /></button><Link to="/" className="cancel-link">Batal</Link>{notice && <p className="notice" role="status">{notice}</p>}</div></aside></form></section>;
+
+  function submit(event) {
+    event.preventDefault();
+    if (!photos.length) { setNotice("Tambahkan minimal 1 foto sepatu."); return; }
+    setNotice("Preview saja. Detail dan foto belum disimpan atau dikirim ke server.");
+  }
+
+  return <section className="form-page">
+    <Link to="/my-shoes" className="back-link">← Kembali ke My Shoes</Link>
+    <div className="page-heading"><span className="eyebrow">{product ? "EDIT LISTING" : "JUAL SEPATU"}</span><h1>{product ? "Perbarui listing kamu." : "Tambahkan sepatu."}</h1><p>Foto yang jelas dan detail kondisi membantu pembeli memilih dengan yakin.</p></div>
+    <form className="product-form" onSubmit={submit}>
+      <div className="form-main">
+        <section className="form-panel"><h2><span>01</span> Foto sepatu</h2><p>Tambahkan 1–5 foto. Foto pertama menjadi foto utama di katalog.</p>
+          <div className="photo-previews">{photos.map((photo, index) => <div className="photo-preview" key={photo.id}><img src={photo.url} alt={`Preview foto sepatu ${index + 1}`} /><span>{index === 0 ? "Utama" : `Foto ${index + 1}`}</span><button type="button" disabled={reading} aria-label={`Hapus foto ${index + 1}`} onClick={() => setPhotos(photos.filter((item) => item.id !== photo.id))}>×</button>{index > 0 && <button type="button" className="make-primary" disabled={reading} onClick={() => setPhotos([photo, ...photos.filter((item) => item.id !== photo.id)])}>Jadikan utama</button>}</div>)}</div>
+          <label className={`upload-zone multi-upload ${reading || photos.length === 5 ? "disabled" : ""}`}><Icon name="upload" size={26} /><strong>{reading ? "Menyiapkan preview…" : photos.length === 5 ? "5 foto sudah dipilih" : "Pilih foto sepatu"}</strong><span>JPG, PNG atau WebP · Maks. 5 MB per foto · {photos.length}/5</span><input disabled={reading || photos.length === 5} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={selectPhotos} /></label>
+          {product && <p className="photo-help">Foto lama tetap ditampilkan. Hapus foto yang ingin diganti, lalu pilih foto baru.</p>}
+        </section>
+        <section className="form-panel"><h2><span>02</span> Detail sepatu</h2><div className="field-grid">
+          <label>Merek<input name="brand" required minLength={2} maxLength={60} defaultValue={product?.brand} placeholder="Nike, Adidas, New Balance…" /></label>
+          <label>Model / artikel<input name="article" required minLength={2} maxLength={120} defaultValue={product?.article} placeholder="Air Force 1 '07" /></label>
+          <label>Kategori<select name="category" required defaultValue={product?.category || ""}><option value="" disabled>Pilih kategori</option>{Object.entries(categories).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <label>Kondisi<select name="condition" required defaultValue={product?.condition || ""}><option value="" disabled>Pilih kondisi</option>{Object.entries(conditions).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <label>Ukuran (EU)<input name="size" type="number" required min={35} max={50} step={0.5} defaultValue={product?.size} placeholder="42 atau 42.5" /></label>
+          <label>Warna<select name="color" required defaultValue={product?.color || ""}><option value="" disabled>Pilih warna</option>{Object.entries(colors).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
+          <label className="span-two">Harga (Rp)<input name="price" type="number" required min={1} max={100000000} step={1} defaultValue={product?.price} placeholder="650000" /><small>Harga rupiah, tanpa titik atau koma.</small></label>
+          <label className="span-two">Deskripsi<textarea name="description" required minLength={10} maxLength={2000} rows={5} defaultValue={product?.description} placeholder="Kondisi upper dan sol, kekurangan, lama pemakaian, serta kelengkapan…" /></label>
+        </div></section>
+      </div>
+      <aside><section className="tips-panel"><h3>Detail yang perlu difoto.</h3><ul><li>Sepatu dari depan dan samping.</li><li>Sol bagian bawah dan insole.</li><li>Label ukuran dan bekas pemakaian.</li><li>Box atau kelengkapan jika tersedia.</li></ul><div className="tip-note">Alamat dan rencana COD dapat dibicarakan langsung melalui chat.</div></section>
+        <div className="form-panel form-submit"><span className="preview-tag">PREVIEW LOKAL</span><p>{product ? "Status listing dikelola secara terpisah dari detail produk." : "Listing baru nantinya berstatus tersedia."}</p><button disabled={reading} className="button dark full">{product ? "Simpan perubahan" : "Pasang listing"}<Icon name="arrow" size={18} /></button><Link to="/my-shoes" className="cancel-link">Batal</Link>{notice && <p className="notice" role="status">{notice}</p>}</div>
+      </aside>
+    </form>
+  </section>;
 }

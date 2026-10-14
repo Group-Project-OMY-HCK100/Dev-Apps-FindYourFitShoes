@@ -4,6 +4,7 @@ import Home from "./pages/Home";
 import ProductDetail from "./pages/ProductDetail";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import MyShoes from "./pages/MyShoes";
 import AddProduct from "./pages/AddProduct";
 import EditProduct from "./pages/EditProduct";
 import Chat from "./pages/Chat";
@@ -15,12 +16,14 @@ function App() {
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<Home />} />
-          <Route path="/products/:id" element={<ProductDetail />} />
+          <Route path="/shoes/:shoeId" element={<ProductDetail />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/addproduct" element={<AddProduct />} />
-          <Route path="/editproduct/:id" element={<EditProduct />} />
-          <Route path="/chat" element={<Chat />} />
+          <Route path="/my-shoes" element={<MyShoes />} />
+          <Route path="/my-shoes/add" element={<AddProduct />} />
+          <Route path="/my-shoes/:shoeId/edit" element={<EditProduct />} />
+          <Route path="/chats" element={<Chat />} />
+          <Route path="/chats/:chatId" element={<Chat />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

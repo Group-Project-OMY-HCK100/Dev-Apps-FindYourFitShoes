@@ -1,9 +1,11 @@
 import { useParams, Link } from "react-router";
 import ProductForm from "../components/ProductForm";
-import { products } from "../data/products";
+import { previewUser, products } from "../data/products";
+
 export default function EditProduct() {
-  const { id } = useParams();
-  const product = products.find(item => item.id === Number(id));
-  if (!product) return <section className="empty-state"><h1>Produk tidak ditemukan.</h1><p>Pakai ID 1–4 untuk melihat template edit produk.</p><Link to="/" className="button dark">Kembali ke home</Link></section>;
+  const { shoeId } = useParams();
+  const user = previewUser;
+  const product = products.find((item) => item.id === shoeId);
+  if (!product || product.seller.id !== user.id) return <section className="empty-state"><h1>Listing ini tidak bisa diedit.</h1><p>Kamu hanya bisa mengedit sepatu milik akunmu.</p><Link to="/my-shoes" className="button dark">Kembali ke My Shoes</Link></section>;
   return <ProductForm key={product.id} product={product} />;
 }

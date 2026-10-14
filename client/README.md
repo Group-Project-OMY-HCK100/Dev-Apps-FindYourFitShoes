@@ -1,8 +1,6 @@
-# Sole Swap — Client
+# Sole Swap — Client UI
 
-Template marketplace sepatu preloved dengan React, Vite, dan React Router.
-
-Desain menggunakan palet hitam, putih, dan abu-abu dengan katalog retail, filter merek/ukuran, serta layout responsif. Foto produk tetap memakai warna asli. Tipografi memakai Barlow Condensed untuk judul/navigasi dan Barlow untuk teks/form; font dimuat dari Google Fonts dengan fallback lokal.
+Template desain berdasarkan `README PRD rev.md`, menggunakan React, Vite, dan React Router. Palet hitam-putih dengan Barlow dan Barlow Condensed.
 
 ## Menjalankan
 
@@ -11,31 +9,34 @@ npm ci
 npm run dev
 ```
 
-## Routing
+## Routing di src/App.jsx
 
-Semua route didefinisikan di `src/App.jsx`.
-
-| Path | Halaman |
+| Path | Template |
 | --- | --- |
-| `/` | Home dan katalog |
-| `/products/:id` | Detail produk (ID contoh: 1–4) |
+| `/` | Katalog, filter, pagination, dan ilustrasi AI search |
+| `/shoes/:shoeId` | Detail, galeri, kondisi/status, aksi pemilik/pembeli |
 | `/login` | Login |
 | `/register` | Register |
-| `/addproduct` | Tambah produk |
-| `/editproduct/:id` | Edit produk (ID contoh: 1–4) |
-| `/chat` | Chat penjual dan admin |
-| `*` | Halaman tidak ditemukan |
+| `/my-shoes` | Listing pribadi, aksi edit/status, dialog hapus |
+| `/my-shoes/add` | Tambah listing dan preview 1–5 foto |
+| `/my-shoes/:shoeId/edit` | Edit listing contoh milik Raka |
+| `/chats` | Inbox |
+| `/chats/:chatId` | Ruang chat pembeli/penjual, sold dan arsip read-only |
+| `*` | 404 |
 
-## Struktur
+Klik kartu katalog untuk menemukan UUID contoh. My Shoes menampilkan listing Raka (ID sepatu berakhiran 002 dan 004). Inbox memiliki contoh peran pembeli, penjual, sold, dan listing dihapus.
 
-- `src/pages`: halaman untuk setiap route.
-- `src/components`: layout, ikon, kartu produk, form autentikasi, dan form produk.
-- `src/data/products.js`: data contoh katalog.
-- `src/index.css`: desain dan breakpoint responsif.
+Semua halaman terbuka untuk review desain. Belum ada autentikasi, route guard, React Context, global state management, request API, atau socket. Akun Raka hanyalah data contoh untuk variasi tampilan kepemilikan.
 
-Belum ada request API, autentikasi, penyimpanan produk, atau chat real-time.
-Filter, favorit, dan foto hanya preview lokal dan tidak tersimpan setelah refresh.
-Foto contoh memakai Unsplash dan membutuhkan koneksi internet.
+State lokal hanya menggerakkan UI: filter/pagination, preview foto, modal, galeri, dan pemilihan contoh loading/empty/error. Submit, ubah status, hapus, dan kirim pesan tidak menyimpan/mengirim data. Hasil AI adalah ilustrasi tetap, bukan pencarian AI sungguhan.
+
+- `src/pages`: template halaman.
+- `src/components`: komponen tampilan bersama.
+- `src/data/products.js`: mock listing dengan UUID dan field sesuai PRD.
+- `src/data/chats.js`: percakapan contoh untuk tampilan.
+- `src/index.css`: styling responsif.
+
+Foto memakai Unsplash dan font memakai Google Fonts; keduanya membutuhkan internet. Implementasi fitur dikerjakan terpisah setelah review desain, satu per satu. Socket ditangani anggota tim lain.
 
 ## Pemeriksaan
 
