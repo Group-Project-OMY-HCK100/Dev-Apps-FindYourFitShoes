@@ -110,21 +110,19 @@ export default function Home() {
     <div className="home">
       <div className="breadcrumbs"><span>Home</span><span>/</span><span>Sepatu preloved</span></div>
 
-      <section className="home-hero">
-        <div className="home-hero-copy">
-          <span className="eyebrow">SOLE SWAP / THE PRELOVED MARKETPLACE</span>
-          <h1>SEPATU BAGUS.<br />NGGAK HARUS BARU.</h1>
-          <p>Temukan koleksi sepatu dari sesama pengguna. Pilih pasanganmu, cek kondisinya, lalu ngobrol langsung dengan penjual.</p>
-          <div className="home-hero-actions">
-            <a href="#explore" className="button light">Lihat koleksi <Icon name="arrow" size={18} /></a>
-            <Link to="/my-shoes/add" className="home-sell-link">Jual sepatumu ↗</Link>
+      <section className="home-hero home-hero-photo">
+        <div className="home-hero-main">
+          <div className="home-hero-copy">
+            <span className="eyebrow">SOLE SWAP / THE PRELOVED MARKETPLACE</span>
+            <h1>SEPATU BAGUS.<br />GA HARUS BARU.</h1>
+            <p>Temukan koleksi sepatu dari sesama pengguna. Pilih pasanganmu, cek kondisinya, lalu ngobrol langsung dengan penjual.</p>
+          </div>
+          <div className="home-hero-mens">
+            <img src="/images/mens-landscape-hero.jpg" alt="Model cowok dengan sneakers putih dalam foto fashion landscape" width={1920} height={960} fetchPriority="high" />
           </div>
         </div>
-        <div className="home-hero-art" aria-hidden="true">
-          <span className="home-art-caption">BUY / WEAR / REPEAT</span>
-          <Icon name="shoe" size={160} />
-          <strong>SECOND HAND.<br />FIRST CHOICE.</strong>
-          <span className="home-art-footer">SOLE SWAP COLLECTION</span>
+        <div className="home-hero-womens">
+          <img src="/images/sneaker-hero.jpg" alt="Model cewek memakai sneakers hitam putih di tangga" width={1200} height={1190} />
         </div>
       </section>
 
@@ -135,30 +133,46 @@ export default function Home() {
       </div>
 
       <section className="catalog home-catalog" id="explore" aria-busy={loading}>
-        <div className="section-heading">
-          <div><span className="eyebrow">THE LATEST LISTINGS</span><h2>{aiQuery ? "HASIL PENCARIAN" : "KOLEKSI SEPATU"}</h2><p>{aiQuery ? `Hasil untuk “${aiQuery}”` : "Listing terbaru dari komunitas Sole Swap."}</p></div>
-          {meta && !error && <span className="home-product-count">{meta.totalItems} sepatu</span>}
+        <div className="home-ai-panel">
+          <div className="home-ai-intro">
+            <h2>Cari sepatu yang kamu butuhkan</h2>
+            <p>Ceritakan sepatu yang kamu inginkan. Kami bantu temukan yang sesuai dari koleksi yang tersedia.</p>
+          </div>
+          <form className="home-search" aria-busy={aiLoading} onSubmit={(event) => { event.preventDefault(); searchShoes(search); }}>
+            <label htmlFor="shoe-search">Deskripsikan sepatu pilihanmu</label>
+            <div className="home-search-input">
+              <span className={`home-search-ai-icon ${aiLoading ? "is-searching" : ""}`} aria-hidden="true">
+                <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                  <circle cx="10" cy="14" r="6.5" stroke="currentColor" strokeWidth="1.8" />
+                  <path d="m15 19 6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                  <path className="ai-search-sparkle" d="M20 1c0 4-2 6-6 6 4 0 6 2 6 6 0-4 2-6 6-6-4 0-6-2-6-6Z" fill="currentColor" />
+                </svg>
+              </span>
+              <input id="shoe-search" value={search} onChange={(event) => { setSearch(event.target.value); setSearchError(""); }} placeholder="Sneakers hitam, ukuran 42, di bawah 500 ribu…" minLength={3} maxLength={300} required disabled={aiLoading} aria-describedby="shoe-search-help" />
+              <button className="button dark" type="submit" disabled={aiLoading}>{aiLoading ? "Mencari…" : "Cari"}<Icon name="arrow" size={17} /></button>
+            </div>
+            <p id="shoe-search-help">Sebutkan ukuran, warna, aktivitas, atau budget kamu.</p>
+            <div className="home-search-examples">
+              <span>Coba:</span>
+              {["Sepatu lari di bawah 500 ribu", "Sneakers putih ukuran 42"].map((example) => <button key={example} type="button" disabled={aiLoading} onClick={() => { setSearch(example); setSearchError(""); }}>{example}</button>)}
+            </div>
+          </form>
+          {searchError && <p className="auth-error home-ai-validation" role="alert">{searchError}</p>}
         </div>
 
-        <div className="home-catalog-controls">
-          <form className="home-search" aria-busy={aiLoading} onSubmit={(event) => { event.preventDefault(); searchShoes(search); }}>
-            <label htmlFor="shoe-search">CARI SEPATUMU</label>
-            <div className="home-search-input">
-              <Icon name="search" size={19} />
-              <input id="shoe-search" value={search} onChange={(event) => { setSearch(event.target.value); setSearchError(""); }} placeholder="Contoh: sneakers hitam ukuran 42 di bawah 500 ribu" minLength={3} maxLength={300} required disabled={aiLoading} aria-describedby="shoe-search-help" />
-              <button className="button dark" type="submit" disabled={aiLoading}>{aiLoading ? "Mencari…" : "Cari"} <Icon name="arrow" size={16} /></button>
-            </div>
-            <p id="shoe-search-help">Tulis model, ukuran, warna, atau budget kamu. AI membantu mencari sepatu yang sesuai.</p>
-          </form>
-          <label className="home-sort" htmlFor="shoe-sort">URUTKAN
-            <select id="shoe-sort" disabled={aiLoading} value={sort} onChange={(event) => { setSort(event.target.value); setPage(1); }}>
-              <option value="newest">{aiQuery ? "Paling sesuai" : "Terbaru"}</option>
-              <option value="price_asc">Harga terendah</option>
-              <option value="price_desc">Harga tertinggi</option>
-            </select>
-          </label>
+        <div className="section-heading home-collection-heading">
+          <div><h2>{aiQuery ? "HASIL PENCARIAN" : "KOLEKSI SEPATU"}</h2><p>{aiQuery ? `Hasil untuk “${aiQuery}”` : "Listing terbaru dari komunitas Sole Swap."}</p></div>
+          <div className="home-collection-tools">
+            {meta && !error && <span className="home-product-count">{meta.totalItems} sepatu</span>}
+            <label className="home-sort" htmlFor="shoe-sort">Urutkan
+              <select id="shoe-sort" disabled={aiLoading} value={sort} onChange={(event) => { setSort(event.target.value); setPage(1); }}>
+                <option value="newest">{aiQuery ? "Paling sesuai" : "Terbaru"}</option>
+                <option value="price_asc">Harga terendah</option>
+                <option value="price_desc">Harga tertinggi</option>
+              </select>
+            </label>
+          </div>
         </div>
-        {searchError && <p className="auth-error" role="alert">{searchError}</p>}
         {aiQuery && <div className="home-ai-heading"><span>{aiLoading ? "Mencari sepatu yang sesuai…" : aiResult?.data?.mode === "fallback" ? "HASIL PENCARIAN BIASA" : "PENCARIAN AI"}</span><button className="plain-button" onClick={backToCatalog}>← Kembali ke koleksi</button></div>}
         {aiResult?.data?.mode === "fallback" && <p className="home-search-notice" role="status">{aiResult.data.notice || "AI sedang tidak tersedia. Hasil menggunakan pencarian teks biasa."}</p>}
         {aiQuery && aiResult?.data && <p className="home-ai-limit">Menampilkan hingga {aiResult.data.meta.limit} hasil. {sort === "newest" ? "" : "Urutan harga berlaku pada hasil pencarian ini."}</p>}
@@ -189,23 +203,29 @@ export default function Home() {
             <div className="product-grid home-product-grid">
               {aiQuery ? aiEntries.map((entry) => <div className="home-ai-product" key={entry.shoe.id}><ProductCard product={entry.shoe} />{aiResult.data.mode === "ai" && entry.reason && <p className="home-ai-reason">{entry.reason}</p>}</div>) : shoes.map((shoe) => <ProductCard key={shoe.id} product={shoe} />)}
             </div>
-            <div className="home-catalog-footer">
-              {aiQuery ? <span>{shoes.length} hasil untuk pencarianmu</span> : <span>Menampilkan {(page - 1) * meta.limit + 1}–{(page - 1) * meta.limit + shoes.length} dari {meta.totalItems} sepatu</span>}
-              {!aiQuery && meta.totalPages > 1 && (
+            {!aiQuery && meta.totalPages > 1 && (
+              <div className="home-catalog-footer">
                 <nav className="home-pagination" aria-label="Halaman koleksi">
                   <button disabled={page === 1} onClick={() => setPage(page - 1)} aria-label="Halaman sebelumnya">←</button>
-                  <span aria-live="polite">{page} / {meta.totalPages}</span>
+                  {Array.from({ length: Math.min(5, meta.totalPages) }, (_, index) => {
+                    const pageNumber = Math.max(1, Math.min(page - 2, meta.totalPages - 4)) + index;
+                    return <button key={pageNumber} aria-label={`Halaman ${pageNumber}`} aria-current={page === pageNumber ? "page" : undefined} onClick={() => setPage(pageNumber)}>{pageNumber}</button>;
+                  })}
                   <button disabled={page >= meta.totalPages} onClick={() => setPage(page + 1)} aria-label="Halaman berikutnya">→</button>
                 </nav>
-              )}
-            </div>
+              </div>
+            )}
           </>
         )}
       </section>
 
-      <section className="home-sell-banner">
-        <div><span className="eyebrow">MAKE ROOM FOR YOUR NEXT PAIR</span><h2>JARANG DIPAKAI?<br />SAATNYA DIJUAL LAGI.</h2><p>Pasang foto, jelaskan kondisi, dan temukan pemilik berikutnya.</p></div>
-        <Link to="/my-shoes/add" className="button dark">Mulai jual <Icon name="arrow" size={18} /></Link>
+      <section className="home-sell-banner" aria-labelledby="sell-banner-title">
+        <div className="home-sell-copy">
+          <span className="eyebrow">MAKE ROOM FOR YOUR NEXT PAIR</span>
+          <h2 id="sell-banner-title">JARANG DIPAKAI? SAATNYA DIJUAL LAGI.</h2>
+          <p>Pasang foto, jelaskan kondisi, dan temukan pemilik berikutnya.</p>
+        </div>
+        <Link to="/my-shoes/add" className="button dark home-sell-cta">Mulai jual <Icon name="arrow" size={18} /></Link>
       </section>
     </div>
   );
