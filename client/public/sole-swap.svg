@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient (Sneaker culture dark mode aesthetic) -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#111111" />
+      <stop offset="100%" stop-color="#222222" />
+    </linearGradient>
+
+    <!-- Vibrant Accent Gradient (Swap & Energy) -->
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#DDDDDD" />
+    </linearGradient>
+
+    <!-- Clean Shoe White Gradient -->
+    <linearGradient id="shoeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#DDDDDD" />
+    </linearGradient>
+  </defs>
+
+  <!-- App Icon Background (Rounded Square) -->
+  <rect width="512" height="512" rx="120" fill="url(#bgGrad)" />
+
+  <!-- Subtle Outer Ring / Badge Border -->
+  <circle cx="256" cy="256" r="192" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="4" />
+
+  <!-- Swap / Exchange Circular Arrows (Marketplace Feature) -->
+  <g stroke="url(#accentGrad)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <!-- Top-Right Arrow Arc -->
+    <path d="M 355 165 A 135 135 0 0 1 400 270" />
+    <path d="M 400 270 L 372 250 M 400 270 L 415 242" />
+
+    <!-- Bottom-Left Arrow Arc -->
+    <path d="M 157 347 A 135 135 0 0 1 112 242" />
+    <path d="M 112 242 L 140 262 M 112 242 L 97 270" />
+  </g>
+
+  <!-- Central Sneaker Silhouette (Find Your Fit) -->
+  <g transform="translate(116, 160)">
+    <!-- Shoe Sole (Sole part) -->
+    <path d="M 20 120 C 40 125, 80 130, 140 130 C 220 130, 240 115, 250 110 L 260 90 C 240 95, 200 100, 150 100 C 90 100, 50 90, 20 120 Z" fill="url(#accentGrad)" />
+    
+    <!-- Shoe Upper Body -->
+    <path d="M 20 120 C 35 90, 60 50, 100 45 C 120 42, 140 55, 160 55 C 190 55, 230 30, 250 45 C 270 60, 260 90, 260 90 C 240 95, 200 100, 150 100 C 90 100, 50 90, 20 120 Z" fill="url(#shoeGrad)" />
+
+    <!-- Laces Detail -->
+    <path d="M 105 48 L 132 72 M 125 43 L 152 67" stroke="#111111" stroke-width="6" stroke-linecap="round" />
+    
+    <!-- Dynamic Branding Swoosh Accent -->
+    <path d="M 55 85 C 95 95, 175 80, 215 60" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" fill="none" opacity="0.9" />
+  </g>
+</svg>
