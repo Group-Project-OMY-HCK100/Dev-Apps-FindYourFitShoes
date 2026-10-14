@@ -81,8 +81,8 @@ function App() {
           <Route path="/register" element={<Register onAuthenticated={handleAuthenticated} user={user} checking={loading} />} />
           <Route element={<ProtectedRoute user={user} loading={loading} error={error} onRetry={retrySession} />}>
             <Route path="/my-shoes" element={<MyShoes />} />
-            <Route path="/my-shoes/add" element={<AddProduct />} />
-            <Route path="/my-shoes/:shoeId/edit" element={<EditProduct />} />
+            <Route path="/my-shoes/add" element={<AddProduct token={token} onUnauthorized={logout} />} />
+            <Route path="/my-shoes/:shoeId/edit" element={<EditProduct user={user} token={token} onUnauthorized={logout} />} />
             <Route path="/chats" element={<Chat />} />
             <Route path="/chats/:chatId" element={<Chat />} />
           </Route>

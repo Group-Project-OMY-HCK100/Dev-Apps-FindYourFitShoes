@@ -645,3 +645,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
   .detail-loading-info { padding: 0; }
   .detail-posted { font-size: 10px; }
 }
+
+.product-form-fields { margin: 0; padding: 0; border: 0; min-width: 0; }
+.product-form-fields:disabled input, .product-form-fields:disabled select,
+.product-form-fields:disabled textarea { background: #f4f4f4; color: #777; }
