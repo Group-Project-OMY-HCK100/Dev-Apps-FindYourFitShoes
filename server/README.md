@@ -36,7 +36,8 @@ AI_TIMEOUT_MS=8000
 
 Provider `openai` dan `openai-compatible` tetap didukung melalui `LLM_API_KEY`, `LLM_MODEL`, dan `LLM_BASE_URL`. Jika provider gagal, timeout, atau menghasilkan JSON invalid, `POST /ai/search` tetap sukses dalam mode `fallback` sesuai PRD.
 Batas harga eksplisit berbahasa Indonesia seperti `di bawah 1 juta`, `maksimal 750 ribu`, atau `di atas Rp500.000` divalidasi ulang oleh server dan tetap diterapkan ketika provider masuk mode fallback.
-Error Gemini sementara (`429`/`5xx`) dicoba ulang sekali dengan jeda singkat selama masih berada dalam batas `AI_TIMEOUT_MS`.
+Brand yang ada di katalog, kondisi, warna eksplisit, ukuran exact, dan rentang ukuran seperti `di atas 40` juga diterapkan sebagai filter keras oleh server. Prompt yang tidak mempunyai kecocokan tidak mengembalikan katalog acak; respons berisi `results: []` dan `notice` yang meminta pengguna menuliskan kebutuhan sepatu.
+Error Gemini sementara (`429`/`5xx`) atau structured JSON yang rusak dicoba ulang sekali dengan jeda singkat selama masih berada dalam batas `AI_TIMEOUT_MS`.
 
 ## Endpoint
 

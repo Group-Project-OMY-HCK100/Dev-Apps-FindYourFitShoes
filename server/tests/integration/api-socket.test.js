@@ -191,6 +191,43 @@ test('REST marketplace dan Socket.io mengikuti alur kontrak utama', { skip: !sho
   assert.equal(aiFallback.body.data.results.some(({ shoe }) => shoe.id === expensive.id), false);
   assert.equal(aiFallback.body.data.results.every(({ shoe }) => shoe.price <= 1000000), true);
 
+  const newBalanceWhite = await Shoe.create({
+    userId: seller.user.id, brand: 'New Balance', article: 'Fresh Foam 42', category: 'running', condition: 'good', size: 42,
+    color: 'white', description: 'Sepatu putih kondisi bagus.', price: 950000, status: 'available', imgUrl1: 'https://example.com/new-balance-white.jpg',
+  });
+  await Shoe.create({
+    userId: seller.user.id, brand: 'Adidas', article: 'Red Size 42', category: 'running', condition: 'good', size: 42,
+    color: 'red', description: 'Sepatu merah ukuran empat puluh dua.', price: 800000, status: 'available', imgUrl1: 'https://example.com/adidas-red.jpg',
+  });
+  const sizeAboveForty = await Shoe.create({
+    userId: seller.user.id, brand: 'Nike', article: 'Large Runner', category: 'running', condition: 'fair', size: 41,
+    color: 'blue', description: 'Sepatu lari ukuran besar.', price: 700000, status: 'available', imgUrl1: 'https://example.com/large-runner.jpg',
+  });
+
+  const brandSearch = await json('/ai/search', {
+    method: 'POST', body: { query: 'saya cari sepatu brand new balance, ukuran 42 kondisi bagus', limit: 12 },
+  });
+  assert.equal(brandSearch.status, 200);
+  assert.equal(brandSearch.body.data.results.some(({ shoe }) => shoe.id === newBalanceWhite.id), true);
+  assert.equal(brandSearch.body.data.results.every(({ shoe }) => shoe.brand === 'New Balance' && Number(shoe.size) === 42 && shoe.condition === 'good'), true);
+
+  const sizeSearch = await json('/ai/search', { method: 'POST', body: { query: 'cari sepatu diatas 40', limit: 12 } });
+  assert.equal(sizeSearch.status, 200);
+  assert.equal(sizeSearch.body.data.results.some(({ shoe }) => shoe.id === sizeAboveForty.id), true);
+  assert.equal(sizeSearch.body.data.results.every(({ shoe }) => Number(shoe.size) > 40), true);
+
+  const colorSearch = await json('/ai/search', { method: 'POST', body: { query: 'cari sepatu warna putih', limit: 12 } });
+  assert.equal(colorSearch.status, 200);
+  assert.equal(colorSearch.body.data.results.some(({ shoe }) => shoe.id === newBalanceWhite.id), true);
+  assert.equal(colorSearch.body.data.results.every(({ shoe }) => shoe.color === 'white'), true);
+
+  for (const irrelevantQuery of ['ronaldo', 'cari sepatu ocha']) {
+    const irrelevant = await json('/ai/search', { method: 'POST', body: { query: irrelevantQuery, limit: 12 } });
+    assert.equal(irrelevant.status, 200);
+    assert.deepEqual(irrelevant.body.data.results, []);
+    assert.match(irrelevant.body.data.notice, /Masukkan prompt yang berkaitan dengan sepatu/u);
+  }
+
   const removed = await json(`/shoes/${shoeId}`, { method: 'DELETE', token: seller.accessToken });
   assert.equal(removed.status, 204);
   assert.equal((await json(`/shoes/${shoeId}`)).status, 404);
