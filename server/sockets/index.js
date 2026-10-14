@@ -4,6 +4,7 @@ const { Message, Shoe, User } = require('../models');
 const env = require('../config/env');
 const ApiError = require('../utils/api-error');
 const chatService = require('../services/chat-service');
+const { emitReadUpdated } = require('../services/realtime-events');
 const { assertUuid, rejectUnknownFields, validationError } = require('../validators/common');
 
 function socketError(error) {
@@ -220,10 +221,7 @@ function registerSockets(io) {
       const chatId = assertUuid(payload.chatId, 'chatId');
       if (payload.lastReadMessageId !== undefined) assertUuid(payload.lastReadMessageId, 'lastReadMessageId');
       const result = await chatService.markRead(chatId, socket.user.id, payload.lastReadMessageId);
-      io.to(`chat:${chatId}`).emit('chat:read:updated', { chatId, readerId: socket.user.id, lastReadMessageId: result.lastReadMessageId });
-      io.to(`user:${socket.user.id}`).emit('unread:update', {
-        totalUnread: await chatService.totalUnread(socket.user.id), chatId, unreadCount: result.unreadCount,
-      });
+      await emitReadUpdated(io, { result, readerId: socket.user.id });
       return { chatId, readCount: result.readCount, unreadCount: result.unreadCount };
     }));
 

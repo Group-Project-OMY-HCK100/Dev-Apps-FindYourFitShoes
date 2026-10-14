@@ -1,18 +1,16 @@
 const { Op, literal } = require('sequelize');
 const { Chat, Shoe, Message } = require('../models');
 const chatService = require('../services/chat-service');
+const { emitReadUpdated } = require('../services/realtime-events');
 const asyncHandler = require('../utils/async-handler');
 const ApiError = require('../utils/api-error');
 const { parsePagination } = require('../utils/pagination');
 const { assertUuid, rejectUnknownFields, validationError } = require('../validators/common');
 
 function emitRead(io, result, readerId) {
-  if (!io) return;
-  const payload = { chatId: result.chat.id, readerId, lastReadMessageId: result.lastReadMessageId };
-  io.to(`chat:${result.chat.id}`).emit('chat:read:updated', payload);
-  chatService.totalUnread(readerId).then((totalUnread) => {
-    io.to(`user:${readerId}`).emit('unread:update', { totalUnread, chatId: result.chat.id, unreadCount: result.unreadCount });
-  }).catch(() => {});
+  void emitReadUpdated(io, { result, readerId }).catch((error) => {
+    if (process.env.NODE_ENV !== 'test') console.error('Gagal broadcast chat:read:updated:', error.message);
+  });
 }
 
 const create = asyncHandler(async (req, res) => {
