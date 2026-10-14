@@ -10,6 +10,9 @@ const {
   parseCurrencyAmount,
   extractExplicitPriceFilters,
   enforceExplicitPriceFilters,
+  extractExplicitListingFilters,
+  buildFilterWhere,
+  hasMeaningfulFilters,
 } = require('../../services/ai-service');
 
 test('normalizeFilters hanya mempertahankan filter allowlist yang valid', () => {
@@ -51,6 +54,7 @@ test('batas harga eksplisit diekstrak tanpa salah membaca ukuran', () => {
   assert.deepEqual(extractExplicitPriceFilters('budget maksimal satu juta'), { maxPrice: 1_000_000 });
   assert.deepEqual(extractExplicitPriceFilters('harga di atas 500 ribu'), { minPrice: 500_000 });
   assert.deepEqual(extractExplicitPriceFilters('sepatu ukuran 42'), {});
+  assert.deepEqual(extractExplicitPriceFilters('cari sepatu diatas 40'), {});
 });
 
 test('batas harga eksplisit mengoreksi interpretasi LLM', () => {
@@ -58,6 +62,31 @@ test('batas harga eksplisit mengoreksi interpretasi LLM', () => {
     enforceExplicitPriceFilters({ category: 'casual', maxPrice: 1_500_000 }, 'casual dibawah 1 juta'),
     { category: 'casual', maxPrice: 1_000_000 },
   );
+});
+
+test('filter listing eksplisit mengenali brand, kondisi, rentang ukuran, dan warna', () => {
+  const brands = ['Nike', 'New Balance', 'Adidas'];
+  assert.deepEqual(
+    extractExplicitListingFilters('saya cari sepatu brand new balance, ukuran 42 kondisi bagus', brands),
+    { brand: 'New Balance', size: 42, condition: 'good' },
+  );
+  assert.deepEqual(extractExplicitListingFilters('cari sepatu diatas 40', brands), { minSize: 40.5 });
+  assert.deepEqual(extractExplicitListingFilters('cari sepatu ukuran di bawah 42', brands), { maxSize: 41.5 });
+  assert.deepEqual(extractExplicitListingFilters('cari sepatu warna putih', brands), { colors: ['white'] });
+});
+
+test('filter query database memakai batas keras untuk seluruh atribut eksplisit', () => {
+  const filters = {
+    brand: 'New Balance', condition: 'good', minSize: 40.5, colors: ['white'], excludeColors: ['red'],
+  };
+  const where = buildFilterWhere(filters);
+  assert.equal(where.status, 'available');
+  assert.equal(typeof where.brand, 'object');
+  assert.equal(where.condition, 'good');
+  assert.equal(typeof where.size, 'object');
+  assert.equal(typeof where.color, 'object');
+  assert.equal(hasMeaningfulFilters(filters), true);
+  assert.equal(hasMeaningfulFilters({}), false);
 });
 
 test('adapter Gemini meminta structured JSON dan menormalisasi respons', async () => {
@@ -83,7 +112,9 @@ test('adapter Gemini meminta structured JSON dan menormalisasi respons', async (
     assert.equal(request.generationConfig.responseMimeType, 'application/json');
     assert.equal(request.generationConfig.responseSchema.type, 'OBJECT');
     assert.equal(request.generationConfig.thinkingConfig.thinkingLevel, 'low');
-    assert.equal(request.generationConfig.maxOutputTokens, 256);
+    assert.equal(request.generationConfig.maxOutputTokens, 512);
+    assert.equal(request.generationConfig.responseSchema.properties.size.type, 'STRING');
+    assert.equal(request.generationConfig.responseSchema.properties.size.enum.includes('42.5'), true);
     assert.equal(captured.options.headers['x-goog-api-key'].length > 0, true);
   } finally {
     global.fetch = originalFetch;
@@ -108,6 +139,31 @@ test('adapter Gemini retry sekali untuk error provider sementara', async () => {
       { geminiApiKey: 'test-key', geminiModel: 'gemini-test', geminiBaseUrl: 'https://example.test/v1beta' },
     );
     assert.deepEqual(result, { category: 'casual' });
+    assert.equal(attempts, 2);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('adapter Gemini retry sekali ketika structured JSON provider rusak', async () => {
+  const originalFetch = global.fetch;
+  let attempts = 0;
+  global.fetch = async () => {
+    attempts += 1;
+    return {
+      ok: true,
+      json: async () => ({
+        candidates: [{ content: { parts: [{ text: attempts === 1 ? '{"brand":"New Balance"' : '{"brand":"New Balance","size":42}' }] } }],
+      }),
+    };
+  };
+  try {
+    const result = await interpretWithGemini(
+      'New Balance ukuran 42',
+      new AbortController().signal,
+      { geminiApiKey: 'test-key', geminiModel: 'gemini-test', geminiBaseUrl: 'https://example.test/v1beta' },
+    );
+    assert.deepEqual(result, { brand: 'New Balance', size: 42 });
     assert.equal(attempts, 2);
   } finally {
     global.fetch = originalFetch;
