@@ -7,7 +7,7 @@ Backend Express + PostgreSQL/Sequelize + Socket.io untuk kontrak pada `README PR
 1. Salin `.env.example` menjadi `.env`, lalu isi PostgreSQL, JWT, Cloudinary, dan Gemini.
 2. Jalankan `npm install`.
 3. Jalankan `npm run db:migrate`.
-4. Opsional: isi `DEMO_USER_PASSWORD` di environment lalu jalankan `npm run db:seed`.
+4. Opsional: jalankan `npm run db:seed` untuk memasukkan data dari `db/users.json` dan `db/shoes.json`.
 5. Jalankan `npm run dev`.
 
 Perintah verifikasi:
@@ -45,11 +45,18 @@ Provider `openai` dan `openai-compatible` tetap didukung melalui `LLM_API_KEY`, 
 
 `POST /shoes` dan `PUT /shoes/:id` wajib `multipart/form-data` dengan file berulang bernama `images`. Update juga wajib mengirim `retainedImageUrls` sebagai JSON-string array.
 
+## Data seed JSON
+
+- `db/users.json` adalah sumber user demo. Nilai `password` akan di-hash dengan bcrypt sebelum disimpan; password mentah tidak dimasukkan ke database.
+- `db/shoes.json` adalah sumber sepatu demo. `user_id` berupa nomor urut user (mulai dari `1`) di `users.json`, lalu seeder mengubahnya menjadi UUID yang sesuai dengan schema PostgreSQL.
+- Seeder memvalidasi isi kedua file dan menjalankan insert user serta sepatu dalam satu transaction.
+- Jika versi seed lama sudah pernah dijalankan, jalankan `npm run db:seed:undo`, lalu `npm run db:seed` agar data diganti dari kedua file JSON.
+
 ## Catatan deployment
 
 - Jalankan pada proses Node long-running yang mendukung WebSocket.
 - Jalankan migration sebelum start aplikasi.
 - Isi `CLIENT_ORIGINS` dengan daftar origin frontend yang dipisahkan koma; wildcard tidak digunakan.
 - Jangan commit `.env`. Secret Cloudinary dan LLM hanya berada di server.
-- File JSON lama di `db/` diabaikan Git dan tidak dipakai aplikasi; PostgreSQL adalah satu-satunya source of truth.
+- File JSON di `db/` hanya menjadi sumber data seed. Setelah proses seed, PostgreSQL tetap menjadi source of truth aplikasi.
 - Untuk lebih dari satu instance aplikasi, tambahkan adapter Socket.io terdistribusi (misalnya Redis) sebelum scale-out.
