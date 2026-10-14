@@ -33,7 +33,7 @@ module.exports = {
     model: process.env.LLM_MODEL || 'gpt-4o-mini',
     baseUrl: (process.env.LLM_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, ''),
     geminiApiKey: process.env.GEMINI_API_KEY || '',
-    geminiModel: process.env.GEMINI_MODEL || 'gemini-3.6-flash',
+    geminiModel: process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite',
     geminiBaseUrl: (process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta').replace(/\/$/, ''),
     geminiThinkingLevel: process.env.GEMINI_THINKING_LEVEL || 'low',
     timeoutMs: parsePositiveInteger(process.env.AI_TIMEOUT_MS, 8000),

@@ -175,9 +175,21 @@ test('REST marketplace dan Socket.io mengikuti alur kontrak utama', { skip: !sho
   const coordinateAfterSold = await emitAck(buyerSocket, 'message:send', { chatId, clientMessageId: randomUUID(), text: 'Baik, sampai jumpa.' });
   assert.equal(coordinateAfterSold.success, true);
 
-  const aiFallback = await json('/ai/search', { method: 'POST', body: { query: 'Nike Air Max hitam', limit: 12 } });
+  const affordable = await Shoe.create({
+    userId: seller.user.id, brand: 'Adidas', article: 'Budget Runner', category: 'running', condition: 'good', size: 42,
+    color: 'black', description: 'Sepatu lari dengan harga terjangkau.', price: 900000, status: 'available', imgUrl1: 'https://example.com/affordable.jpg',
+  });
+  const expensive = await Shoe.create({
+    userId: seller.user.id, brand: 'Adidas', article: 'Premium Runner', category: 'running', condition: 'good', size: 42,
+    color: 'black', description: 'Sepatu lari premium.', price: 1100000, status: 'available', imgUrl1: 'https://example.com/expensive.jpg',
+  });
+  const aiFallback = await json('/ai/search', { method: 'POST', body: { query: 'sepatu harga di bawah 1 juta', limit: 12 } });
   assert.equal(aiFallback.status, 200);
   assert.equal(aiFallback.body.data.mode, 'fallback');
+  assert.equal(aiFallback.body.data.interpretedFilters, null);
+  assert.equal(aiFallback.body.data.results.some(({ shoe }) => shoe.id === affordable.id), true);
+  assert.equal(aiFallback.body.data.results.some(({ shoe }) => shoe.id === expensive.id), false);
+  assert.equal(aiFallback.body.data.results.every(({ shoe }) => shoe.price <= 1000000), true);
 
   const removed = await json(`/shoes/${shoeId}`, { method: 'DELETE', token: seller.accessToken });
   assert.equal(removed.status, 204);
