@@ -1,6 +1,6 @@
-# Sole Swap — Client UI
+# Sole Swap — Client
 
-Template desain berdasarkan `README PRD rev.md`, menggunakan React, Vite, dan React Router. Palet hitam-putih dengan Barlow dan Barlow Condensed.
+React + Vite + React Router. Pola pengerjaan mengikuti I-ProjectMike: Axios langsung di komponen, async/await, input useState/onChange, dan constants/baseUrl.js. Tanpa folder api/utils, custom hook request, Redux, atau React Context.
 
 ## Menjalankan
 
@@ -9,34 +9,27 @@ npm ci
 npm run dev
 ```
 
-## Routing di src/App.jsx
+API default http://localhost:3000. Untuk URL berbeda, salin .env.example ke .env.local, isi VITE_API_URL, lalu restart Vite. Server dijalankan terpisah oleh tim backend.
 
-| Path | Template |
-| --- | --- |
-| `/` | Katalog, filter, pagination, dan ilustrasi AI search |
-| `/shoes/:shoeId` | Detail, galeri, kondisi/status, aksi pemilik/pembeli |
-| `/login` | Login |
-| `/register` | Register |
-| `/my-shoes` | Listing pribadi, aksi edit/status, dialog hapus |
-| `/my-shoes/add` | Tambah listing dan preview 1–5 foto |
-| `/my-shoes/:shoeId/edit` | Edit listing contoh milik Raka |
-| `/chats` | Inbox |
-| `/chats/:chatId` | Ruang chat pembeli/penjual, sold dan arsip read-only |
-| `*` | 404 |
+## Scope: register dan login saja
 
-Klik kartu katalog untuk menemukan UUID contoh. My Shoes menampilkan listing Raka (ID sepatu berakhiran 002 dan 004). Inbox memiliki contoh peran pembeli, penjual, sold, dan listing dihapus.
+Hanya tiga endpoint yang dipakai:
 
-Semua halaman terbuka untuk review desain. Belum ada autentikasi, route guard, React Context, global state management, request API, atau socket. Akun Raka hanyalah data contoh untuk variasi tampilan kepemilikan.
+- POST /register: mendaftar dan langsung menerima sesi dari backend.
+- POST /login: masuk dengan email/password.
+- GET /auth/me: memeriksa token saat refresh.
 
-State lokal hanya menggerakkan UI: filter/pagination, preview foto, modal, galeri, dan pemilihan contoh loading/empty/error. Submit, ubah status, hapus, dan kirim pesan tidak menyimpan/mengirim data. Hasil AI adalah ilustrasi tetap, bukan pencarian AI sungguhan.
+Token disimpan di sessionStorage (access_token). App.jsx meneruskan akun melalui props. Logout menghapus token; respons 401 saat pengecekan sesi mengembalikan akun menjadi guest. Form memiliki loading, error server, dan pencegahan submit berulang.
 
-- `src/pages`: template halaman.
-- `src/components`: komponen tampilan bersama.
-- `src/data/products.js`: mock listing dengan UUID dan field sesuai PRD.
-- `src/data/chats.js`: percakapan contoh untuk tampilan.
-- `src/index.css`: styling responsif.
+Home, katalog, detail, My Shoes, tambah/edit produk, dan chat tetap template dengan data contoh lokal. Tidak ada request sepatu, chat, AI, CRUD, ataupun socket. Data di src/data hanya untuk menampilkan desain; tidak tersimpan di backend.
 
-Foto memakai Unsplash dan font memakai Google Fonts; keduanya membutuhkan internet. Implementasi fitur dikerjakan terpisah setelah review desain, satu per satu. Socket ditangani anggota tim lain.
+Guest dapat membuka /, /shoes, dan /shoes/:shoeId. Chat dan halaman pengelolaan sepatu memakai ProtectedRoute. Saat guest membuka chat, diarahkan ke login dan kembali ke tujuan setelah berhasil masuk/register. Link antar login/register mempertahankan tujuan; redirect hanya menerima route internal yang dikenali.
+
+## Routing di App.jsx
+
+- Publik: /, /shoes, /shoes/:shoeId, /login, /register.
+- Login: /my-shoes, /my-shoes/add, /my-shoes/:shoeId/edit, /chats, /chats/:chatId.
+- Halaman lain: 404.
 
 ## Pemeriksaan
 
@@ -44,3 +37,5 @@ Foto memakai Unsplash dan font memakai Google Fonts; keduanya membutuhkan intern
 npm run lint
 npm run build
 ```
+
+Uji manual dengan backend aktif: register, login, password salah, email duplikat, klik Chat penjual sebagai guest, refresh halaman privat, dan logout. Tampilan home/detail tetap bisa ditinjau saat backend tidak aktif. Folder server tidak diubah.

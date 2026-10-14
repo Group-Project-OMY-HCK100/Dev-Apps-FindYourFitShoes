@@ -3,12 +3,11 @@ import { Link, useParams } from "react-router";
 import Icon from "../components/Icon";
 import ProductCard from "../components/ProductCard";
 import { chats } from "../data/chats";
-import { previewUser, products, formatPrice, shoeName, shoeImages, conditions, categories, colors } from "../data/products";
+import { products, formatPrice, shoeName, shoeImages, conditions, categories, colors } from "../data/products";
 
-function ProductContent({ product }) {
+function ProductContent({ product, user }) {
   const [activePhoto, setActivePhoto] = useState(0);
   const [notice, setNotice] = useState("");
-  const user = previewUser;
   const images = shoeImages(product);
   const own = user?.id === product.seller.id;
   const sold = product.status === "sold";
@@ -50,7 +49,7 @@ function ProductContent({ product }) {
           {own && <button className="button outline owner-status" onClick={() => setNotice(`Preview: status akan menjadi ${sold ? "tersedia" : "terjual"}. Data contoh tetap sama.`)}>{sold ? "Jadikan tersedia" : "Tandai terjual"}</button>}
           {sold && <p className="notice">Listing tetap bisa dilihat. Chat baru tidak tersedia; percakapan lama bisa dibuka melalui inbox.</p>}
           {notice && <p className="notice" role="status">{notice}</p>}
-          <p className="detail-preview-note">Contoh tampilan akun Raka. Data produk dan percakapan belum terhubung ke server.</p>
+          <p className="detail-preview-note">Template detail dan chat memakai data contoh, belum terhubung ke server.</p>
 
           <section className="detail-seller" aria-label="Informasi penjual">
             <span className="avatar">{product.seller.name.charAt(0)}</span>
@@ -80,7 +79,7 @@ function ProductContent({ product }) {
   );
 }
 
-export default function ProductDetail() {
+export default function ProductDetail({ user }) {
   const { shoeId } = useParams();
   const product = products.find((item) => item.id === shoeId);
 
@@ -95,5 +94,5 @@ export default function ProductDetail() {
     );
   }
 
-  return <ProductContent key={product.id} product={product} />;
+  return <ProductContent key={product.id} product={product} user={user} />;
 }
