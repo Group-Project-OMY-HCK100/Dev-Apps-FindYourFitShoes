@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router";
-import axios from "axios";
-import baseUrl from "../constants/baseUrl";
+import { useDispatch, useSelector } from "react-redux";
+import { clearFormError, loginAsync, registerAsync } from "../features/auth/authSlice";
 import Icon from "./Icon";
 
-export default function AuthForm({ register = false, onAuthenticated, user, checking }) {
+export default function AuthForm({ register = false }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const dispatch = useDispatch();
+  const { user, loading: checking, submitting: loading, formError: error } = useSelector((state) => state.auth);
   const [showPassword, setShowPassword] = useState(false);
   const busy = useRef(false);
   const request = useRef(null);
@@ -23,33 +23,26 @@ export default function AuthForm({ register = false, onAuthenticated, user, chec
   const destination = typeof from === "string" && allowed.test(from) ? from : "/";
   const switchPath = `${register ? "/login" : "/register"}${destination === "/" ? "" : `?returnTo=${encodeURIComponent(destination)}`}`;
   const disabled = loading || checking;
-  useEffect(() => () => request.current?.abort(), []);
+  useEffect(() => {
+    dispatch(clearFormError());
+    return () => request.current?.abort();
+  }, [dispatch, register]);
 
   async function submit(event) {
     event.preventDefault();
     if (busy.current || disabled) return;
     busy.current = true;
-    setLoading(true);
-    setError("");
     const controller = new AbortController();
     request.current = controller;
     try {
       const body = { email: email.trim().toLowerCase(), password };
       if (register) body.name = name.trim();
-      const { data } = await axios.post(`${baseUrl}${register ? "/register" : "/login"}`, body, {
-        signal: controller.signal,
-        timeout: 15000,
-      });
-      if (controller.signal.aborted) return;
-      onAuthenticated(data.data);
+      const action = register ? registerAsync(body, controller.signal) : loginAsync(body, controller.signal);
+      const account = await dispatch(action);
+      if (controller.signal.aborted || !account) return;
       navigate(destination, { replace: true, state: location.state });
-    } catch (problem) {
-      if (axios.isCancel(problem)) return;
-      const details = problem.response?.data?.error?.details;
-      setError(details?.length ? details.map((detail) => detail.message).join(". ") : problem.response?.data?.error?.message || "Belum bisa terhubung ke server. Silakan coba lagi.");
     } finally {
       busy.current = false;
-      if (!controller.signal.aborted) setLoading(false);
     }
   }
 
